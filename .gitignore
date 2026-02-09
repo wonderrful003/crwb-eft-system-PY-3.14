@@ -1,0 +1,24 @@
+# HTML Templates (to help GitHub show Python as main language)
+templates/**/*.html
+!templates/base.html
+
+# Django media files
+media/
+
+# Local settings
+local_settings.py
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
