@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}Review Batch - {{ batch.batch_reference }}{% endblock %}
+
+{% block page_title %}Review EFT Batch for Approval{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'authorizer_dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item active">Review Batch</li>
+{% endblock %}
+
+{% block content %}
+<!-- Batch Summary -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="dashboard-card border-warning">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> Batch Summary
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless">
+                    <tr>
+                        <th width="200">Batch Reference:</th>
+                        <td><strong>{{ batch.batch_reference }}</strong></td>
+                    </tr>
+                    <tr>
+                        <th>Batch Name:</th>
+                        <td>{{ batch.batch_name }}</td>
+                    </tr>
+                    <tr>
+                        <th>Created By:</th>
+                        <td>{{ batch.created_by.get_full_name|default:batch.created_by.username }}</td>
+                    </tr>
+                    <tr>
+                        <th>Created Date:</th>
+                        <td>{{ batch.created_at|date:"l, d F Y H:i:s" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Total Records:</th>
+                        <td><strong class="text-primary">{{ batch.record_count }}</strong></td>
+                    </tr>
+                    <tr>
+                        <th>Total Amount:</th>
+                        <td><strong class="text-success fs-5">MWK {{ total_amount|floatformat:2 }}</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="dashboard-card border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-clipboard-check"></i> Approve
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'approve_batch' batch.id %}">
+                    {% csrf_token %}
+                    {{ approval_form.as_p }}
+                    <button type="submit" class="btn btn-success w-100" 
+                            onclick="return confirm('Are you sure you want to APPROVE this batch?')">
+                        <i class="fas fa-check-circle"></i> Approve Batch
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="dashboard-card border-danger mt-3">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-times-circle"></i> Reject
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'reject_batch' batch.id %}">
+                    {% csrf_token %}
+                    {{ rejection_form.as_p }}
+                    <button type="submit" class="btn btn-danger w-100"
+                            onclick="return confirm('Are you sure you want to REJECT this batch?')">
+                        <i class="fas fa-ban"></i> Reject Batch
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transaction Details -->
+<div class="row">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Transaction Details ({{ transactions.count }} records)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Seq</th>
+                                <th>Debit Account</th>
+                                <th>Supplier</th>
+                                <th>Bank</th>
+                                <th>Account No</th>
+                                <th>Scheme</th>
+                                <th>Zone</th>
+                                <th class="text-end">Amount (MWK)</th>
+                                <th>Narration</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trans in transactions %}
+                            <tr>
+                                <td>{{ trans.sequence_number }}</td>
+                                <td>{{ trans.debit_account.account_number }}</td>
+                                <td>{{ trans.supplier.supplier_name }}</td>
+                                <td>{{ trans.supplier.bank.bank_name }}</td>
+                                <td><code>{{ trans.supplier.account_number }}</code></td>
+                                <td>{{ trans.scheme.scheme_code }}</td>
+                                <td>{{ trans.zone.zone_code }}</td>
+                                <td class="text-end"><strong>{{ trans.amount|floatformat:2 }}</strong></td>
+                                <td>{{ trans.narration }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-info">
+                            <tr>
+                                <th colspan="7" class="text-end">TOTAL:</th>
+                                <th class="text-end">MWK {{ total_amount|floatformat:2 }}</th>
+                                <th></th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,348 @@
+<!-- accounts/view_batch.html -->
+{% extends 'base.html' %}
+
+{% block title %}View Batch - {{ batch.batch_reference }} - CRWB EFT{% endblock %}
+
+{% block page_title %}
+    {% if batch.status == 'APPROVED' %}
+        <i class="fas fa-check-circle text-success"></i>
+    {% elif batch.status == 'REJECTED' %}
+        <i class="fas fa-times-circle text-danger"></i>
+    {% elif batch.status == 'PENDING' %}
+        <i class="fas fa-clock text-info"></i>
+    {% else %}
+        <i class="fas fa-file-alt text-warning"></i>
+    {% endif %}
+    EFT Batch Details
+{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'accounts_dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{% url 'batch_list' %}">Batches</a></li>
+<li class="breadcrumb-item active">{{ batch.batch_reference }}</li>
+{% endblock %}
+
+{% block sidebar_menu %}
+<li>
+    <a href="{% url 'accounts_dashboard' %}">
+        <i class="fas fa-tachometer-alt"></i>
+        <span>Dashboard</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'batch_list' %}">
+        <i class="fas fa-list"></i>
+        <span>My Batches</span>
+    </a>
+</li>
+{% endblock %}
+
+{% block top_actions %}
+<div class="btn-group">
+    {% if batch.status == 'DRAFT' %}
+    <a href="{% url 'edit_batch' batch.id %}" class="btn btn-warning">
+        <i class="fas fa-edit"></i> Edit Batch
+    </a>
+    {% endif %}
+    {% if batch.status == 'APPROVED' %}
+    <a href="{% url 'export_batch' batch.id 'txt' %}" class="btn btn-success">
+        <i class="fas fa-download"></i> Download TXT
+    </a>
+    <a href="{% url 'export_batch' batch.id 'csv' %}" class="btn btn-outline-success">
+        <i class="fas fa-file-csv"></i> Download CSV
+    </a>
+    {% endif %}
+    <a href="{% url 'batch_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to List
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Batch Status Banner -->
+<div class="alert 
+    {% if batch.status == 'APPROVED' %}alert-success
+    {% elif batch.status == 'REJECTED' %}alert-danger
+    {% elif batch.status == 'PENDING' %}alert-info
+    {% else %}alert-warning{% endif %} 
+    border-0 shadow-sm mb-4">
+    <div class="row align-items-center">
+        <div class="col-auto">
+            <i class="fas fa-3x 
+                {% if batch.status == 'APPROVED' %}fa-check-circle
+                {% elif batch.status == 'REJECTED' %}fa-times-circle
+                {% elif batch.status == 'PENDING' %}fa-clock
+                {% else %}fa-edit{% endif %}">
+            </i>
+        </div>
+        <div class="col">
+            <h5 class="mb-1">
+                {% if batch.status == 'APPROVED' %}
+                    Batch Approved Successfully
+                {% elif batch.status == 'REJECTED' %}
+                    Batch Rejected
+                {% elif batch.status == 'PENDING' %}
+                    Batch Pending Approval
+                {% else %}
+                    Batch in Draft Status
+                {% endif %}
+            </h5>
+            <p class="mb-0">
+                {% if batch.status == 'APPROVED' %}
+                    This batch has been approved and is ready for processing. You can download the export files.
+                {% elif batch.status == 'REJECTED' %}
+                    This batch was rejected. Please check the rejection reason below.
+                {% elif batch.status == 'PENDING' %}
+                    This batch is awaiting authorization. You will be notified once it's reviewed.
+                {% else %}
+                    This batch is still in draft. You can continue editing it.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Details -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="dashboard-card">
+            <div class="card-header 
+                {% if batch.status == 'APPROVED' %}bg-success text-white
+                {% elif batch.status == 'REJECTED' %}bg-danger text-white
+                {% elif batch.status == 'PENDING' %}bg-info text-white
+                {% else %}bg-warning{% endif %}">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> Batch Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless">
+                    <tbody>
+                        <tr>
+                            <th width="200"><i class="fas fa-hashtag text-primary"></i> Batch Reference:</th>
+                            <td><strong class="text-primary fs-5">{{ batch.batch_reference }}</strong></td>
+                        </tr>
+                        <tr>
+                            <th><i class="fas fa-tag text-info"></i> Batch Name:</th>
+                            <td><strong>{{ batch.batch_name }}</strong></td>
+                        </tr>
+                        <tr>
+                            <th><i class="fas fa-flag text-warning"></i> Status:</th>
+                            <td>
+                                {% if batch.status == 'DRAFT' %}
+                                <span class="status-badge status-draft fs-6">
+                                    <i class="fas fa-edit"></i> Draft
+                                </span>
+                                {% elif batch.status == 'PENDING' %}
+                                <span class="status-badge status-pending fs-6">
+                                    <i class="fas fa-clock"></i> Pending Approval
+                                </span>
+                                {% elif batch.status == 'APPROVED' %}
+                                <span class="status-badge status-approved fs-6">
+                                    <i class="fas fa-check"></i> Approved
+                                </span>
+                                {% elif batch.status == 'REJECTED' %}
+                                <span class="status-badge status-rejected fs-6">
+                                    <i class="fas fa-times"></i> Rejected
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><i class="fas fa-list-ol text-secondary"></i> Total Records:</th>
+                            <td><span class="badge bg-secondary fs-6">{{ batch.record_count }}</span></td>
+                        </tr>
+                        <tr>
+                            <th><i class="fas fa-money-bill-wave text-success"></i> Total Amount:</th>
+                            <td><strong class="text-success fs-4">MWK {{ batch.total_amount|floatformat:2 }}</strong></td>
+                        </tr>
+                        <tr>
+                            <th><i class="fas fa-coins text-warning"></i> Currency:</th>
+                            <td><strong>{{ batch.currency }}</strong></td>
+                        </tr>
+                        <tr>
+                            <th><i class="fas fa-user text-primary"></i> Created By:</th>
+                            <td>{{ batch.created_by.get_full_name|default:batch.created_by.username }}</td>
+                        </tr>
+                        <tr>
+                            <th><i class="fas fa-calendar-alt text-info"></i> Created At:</th>
+                            <td>{{ batch.created_at|date:"l, d F Y" }} at {{ batch.created_at|date:"H:i:s" }}</td>
+                        </tr>
+                        {% if batch.approved_by %}
+                        <tr class="table-success">
+                            <th><i class="fas fa-user-check text-success"></i> Approved By:</th>
+                            <td>{{ batch.approved_by.get_full_name|default:batch.approved_by.username }}</td>
+                        </tr>
+                        <tr class="table-success">
+                            <th><i class="fas fa-calendar-check text-success"></i> Approved At:</th>
+                            <td>{{ batch.approved_at|date:"l, d F Y" }} at {{ batch.approved_at|date:"H:i:s" }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if batch.rejection_reason %}
+                        <tr class="table-danger">
+                            <th><i class="fas fa-exclamation-circle text-danger"></i> Rejection Reason:</th>
+                            <td class="text-danger"><strong>{{ batch.rejection_reason }}</strong></td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="dashboard-card mb-3">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie"></i> Batch Summary
+                </h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="fas fa-file-invoice-dollar fa-3x text-primary"></i>
+                </div>
+                <h3 class="text-primary">{{ batch.record_count }}</h3>
+                <p class="text-muted mb-3">Total Transactions</p>
+                <hr>
+                <h4 class="text-success">MWK {{ batch.total_amount|floatformat:2 }}</h4>
+                <p class="text-muted mb-0">Total Amount</p>
+            </div>
+        </div>
+
+        {% if batch.status == 'APPROVED' %}
+        <div class="dashboard-card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-download fa-2x mb-3"></i>
+                <h6>Download Options</h6>
+                <div class="d-grid gap-2 mt-3">
+                    <a href="{% url 'export_batch' batch.id 'txt' %}" class="btn btn-light">
+                        <i class="fas fa-file-alt"></i> TXT Format
+                    </a>
+                    <a href="{% url 'export_batch' batch.id 'csv' %}" class="btn btn-light">
+                        <i class="fas fa-file-csv"></i> CSV Format
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="dashboard-card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-list-check text-success"></i> Transaction Details
+            <span class="badge bg-primary ms-2">{{ transactions.count }} records</span>
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if transactions %}
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th width="50">Seq</th>
+                        <th>Debit Account</th>
+                        <th>Supplier</th>
+                        <th>Bank</th>
+                        <th>Account No</th>
+                        <th>Scheme</th>
+                        <th>Zone</th>
+                        <th class="text-end">Amount (MWK)</th>
+                        <th>Narration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for trans in transactions %}
+                    <tr>
+                        <td class="text-center"><strong>#{{ trans.sequence_number }}</strong></td>
+                        <td><code>{{ trans.debit_account.account_number }}</code></td>
+                        <td>
+                            <strong>{{ trans.supplier.supplier_name }}</strong><br>
+                            <small class="text-muted">{{ trans.supplier.supplier_code }}</small>
+                        </td>
+                        <td>{{ trans.supplier.bank.bank_name }}</td>
+                        <td><code>{{ trans.supplier.account_number }}</code></td>
+                        <td><span class="badge bg-info">{{ trans.scheme.scheme_code }}</span></td>
+                        <td><span class="badge bg-secondary">{{ trans.zone.zone_code }}</span></td>
+                        <td class="text-end"><strong>{{ trans.amount|floatformat:2 }}</strong></td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 200px;" title="{{ trans.narration }}">
+                                {{ trans.narration }}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-success">
+                    <tr>
+                        <th colspan="7" class="text-end">GRAND TOTAL:</th>
+                        <th class="text-end">MWK {{ batch.total_amount|floatformat:2 }}</th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> No transactions found in this batch.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Audit Log -->
+{% if audit_logs %}
+<div class="dashboard-card mt-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">
+            <i class="fas fa-history"></i> Audit Trail
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="timeline">
+            {% for log in audit_logs %}
+            <div class="d-flex mb-3 pb-3 border-bottom">
+                <div class="me-3">
+                    {% if log.action == 'CREATED' %}
+                    <i class="fas fa-plus-circle fa-2x text-primary"></i>
+                    {% elif log.action == 'SUBMITTED' %}
+                    <i class="fas fa-paper-plane fa-2x text-info"></i>
+                    {% elif log.action == 'APPROVED' %}
+                    <i class="fas fa-check-circle fa-2x text-success"></i>
+                    {% elif log.action == 'REJECTED' %}
+                    <i class="fas fa-times-circle fa-2x text-danger"></i>
+                    {% endif %}
+                </div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between">
+                        <strong>
+                            {% if log.action == 'CREATED' %}
+                            Batch Created
+                            {% elif log.action == 'SUBMITTED' %}
+                            Submitted for Approval
+                            {% elif log.action == 'APPROVED' %}
+                            Batch Approved
+                            {% elif log.action == 'REJECTED' %}
+                            Batch Rejected
+                            {% endif %}
+                        </strong>
+                        <small class="text-muted">{{ log.timestamp|date:"d M Y H:i" }}</small>
+                    </div>
+                    <small class="text-muted">
+                        by {{ log.user.get_full_name|default:log.user.username }}
+                    </small>
+                    {% if log.remarks %}
+                    <div class="mt-2 p-2 bg-light rounded">
+                        <small><i class="fas fa-comment"></i> {{ log.remarks }}</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

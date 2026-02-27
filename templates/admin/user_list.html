@@ -1,0 +1,647 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management{% endblock %}
+
+{% block page_title %}User Management{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item active">Users</li>
+{% endblock %}
+
+{% block sidebar_menu %}
+<li><a href="{% url 'admin_dashboard' %}"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+<li><a href="{% url 'user_list' %}" class="active"><i class="fas fa-users"></i> <span>Users</span></a></li>
+<li><a href="{% url 'bank_list' %}"><i class="fas fa-university"></i> <span>Banks</span></a></li>
+<li><a href="{% url 'zone_list' %}"><i class="fas fa-map-marker-alt"></i> <span>Zones</span></a></li>
+<li><a href="{% url 'scheme_list' %}"><i class="fas fa-project-diagram"></i> <span>Schemes</span></a></li>
+<li><a href="{% url 'supplier_list' %}"><i class="fas fa-truck"></i> <span>Suppliers</span></a></li>
+<li><a href="{% url 'debit_account_list' %}"><i class="fas fa-credit-card"></i> <span>Debit Accounts</span></a></li>
+{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'user_create' %}" class="btn btn-primary">
+    <i class="fas fa-user-plus"></i> Add New User
+</a>
+<div class="btn-group">
+    <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="fas fa-download"></i> Export
+    </button>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{% url 'user_export' %}?format=csv">CSV</a></li>
+        <li><a class="dropdown-item" href="{% url 'user_export' %}?format=excel">Excel</a></li>
+        <li><a class="dropdown-item" href="{% url 'user_export' %}?format=pdf">PDF</a></li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-users text-primary"></i> System Users
+            </h5>
+            <div class="text-muted">
+                <span class="badge bg-light text-dark">{{ users.count }} users</span>
+            </div>
+        </div>
+        
+        <!-- Search and Filter Form -->
+        <form method="get" class="mt-3">
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <input type="text" name="q" class="form-control" placeholder="Search by username or email..." 
+                           value="{{ request.GET.q }}">
+                </div>
+                <div class="col-md-3">
+                    <select name="role" class="form-select">
+                        <option value="">All Roles</option>
+                        <option value="System Admin" {% if request.GET.role == 'System Admin' %}selected{% endif %}>System Admin</option>
+                        <option value="Accounts Personnel" {% if request.GET.role == 'Accounts Personnel' %}selected{% endif %}>Accounts Personnel</option>
+                        <option value="Authorizer" {% if request.GET.role == 'Authorizer' %}selected{% endif %}>Authorizer</option>
+                        <option value="Superuser" {% if request.GET.role == 'Superuser' %}selected{% endif %}>Superuser</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">All Status</option>
+                        <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Search</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <div class="card-body">
+        {% if users %}
+        <!-- Bulk Actions -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="selectAll">
+                <label class="form-check-label" for="selectAll">Select All</label>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-success" id="bulkActivate">Activate</button>
+                <button class="btn btn-sm btn-outline-warning" id="bulkDeactivate">Deactivate</button>
+                <button class="btn btn-sm btn-outline-danger" id="bulkDelete">Delete</button>
+                <button class="btn btn-sm btn-outline-info" id="bulkResetPassword">Reset Password</button>
+            </div>
+        </div>
+        
+        <!-- Desktop Table View -->
+        <div class="d-none d-lg-block">
+            <div class="table-responsive">
+                <table class="table table-hover data-table">
+                    <thead>
+                        <tr>
+                            <th width="50">
+                                <input type="checkbox" class="form-check-input" id="tableSelectAll">
+                            </th>
+                            <th>#</th>
+                            <th>
+                                <a href="?sort=username&order={% if sort_field == 'username' and order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.role %}&role={{ request.GET.role }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                                   class="text-decoration-none text-dark">
+                                    Username
+                                    {% if sort_field == 'username' %}
+                                    <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %}"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>Full Name</th>
+                            <th>Email</th>
+                            <th>
+                                <a href="?sort=role&order={% if sort_field == 'role' and order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.role %}&role={{ request.GET.role }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                                   class="text-decoration-none text-dark">
+                                    Role
+                                    {% if sort_field == 'role' %}
+                                    <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %}"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?sort=is_active&order={% if sort_field == 'is_active' and order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.role %}&role={{ request.GET.role }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                                   class="text-decoration-none text-dark">
+                                    Status
+                                    {% if sort_field == 'is_active' %}
+                                    <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %}"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>Last Login</th>
+                            <th>
+                                <a href="?sort=date_joined&order={% if sort_field == 'date_joined' and order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.role %}&role={{ request.GET.role }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                                   class="text-decoration-none text-dark">
+                                    Date Joined
+                                    {% if sort_field == 'date_joined' %}
+                                    <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %}"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user_obj in users %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input user-checkbox" 
+                                       value="{{ user_obj.id }}"
+                                       {% if user_obj == user or user_obj.is_superuser %}disabled{% endif %}>
+                            </td>
+                            <td>{{ forloop.counter }}</td>
+                            <td>
+                                <strong>{{ user_obj.username }}</strong>
+                                {% if user_obj == user %}
+                                <span class="badge bg-info ms-1">You</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user_obj.get_full_name|default:"-" }}</td>
+                            <td>{{ user_obj.email|default:"-" }}</td>
+                            <td>
+                                {% if user_obj.is_superuser %}
+                                <span class="badge bg-danger">Superuser</span>
+                                {% elif user_obj.groups.first %}
+                                <span class="badge bg-primary">{{ user_obj.groups.first.name }}</span>
+                                {% else %}
+                                <span class="badge bg-secondary">No Role</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user_obj != user and not user_obj.is_superuser %}
+                                <form method="post" action="{% url 'user_toggle_status' user_obj.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="btn btn-sm btn-{% if user_obj.is_active %}success{% else %}secondary{% endif %}"
+                                            onclick="return confirm('Change user status to {% if user_obj.is_active %}inactive{% else %}active{% endif %}?')">
+                                        {{ user_obj.is_active|yesno:'Active,Inactive' }}
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="badge bg-{% if user_obj.is_active %}success{% else %}secondary{% endif %}">
+                                    {{ user_obj.is_active|yesno:'Active,Inactive' }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user_obj.last_login|date:"d M Y H:i"|default:"Never" }}</td>
+                            <td>{{ user_obj.date_joined|date:"d M Y" }}</td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'user_detail' user_obj.id %}" class="btn btn-sm btn-outline-info" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'user_edit' user_obj.id %}" class="btn btn-sm btn-outline-primary" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'user_reset_password' user_obj.id %}" class="btn btn-sm btn-outline-warning" title="Reset Password">
+                                        <i class="fas fa-key"></i>
+                                    </a>
+                                    {% if user_obj != user and not user_obj.is_superuser %}
+                                    <a href="{% url 'user_delete' user_obj.id %}" class="btn btn-sm btn-outline-danger" title="Delete"
+                                       onclick="return confirm('Are you sure you want to delete user {{ user_obj.username }}?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Mobile Card View -->
+        <div class="d-lg-none">
+            <div class="row">
+                {% for user_obj in users %}
+                <div class="col-12 mb-3">
+                    <div class="card border h-100 user-card">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-user text-primary"></i>
+                                <strong>{{ user_obj.username }}</strong>
+                                {% if user_obj == user %}
+                                <span class="badge bg-info ms-1">You</span>
+                                {% endif %}
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input user-checkbox" 
+                                       value="{{ user_obj.id }}"
+                                       {% if user_obj == user or user_obj.is_superuser %}disabled{% endif %}>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="card-title">{{ user_obj.get_full_name|default:"No name" }}</h6>
+                            <p class="small text-muted mb-2">
+                                <i class="fas fa-envelope"></i> {{ user_obj.email|default:"No email" }}
+                            </p>
+                            
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Role:</small>
+                                    {% if user_obj.is_superuser %}
+                                    <span class="badge bg-danger">Superuser</span>
+                                    {% elif user_obj.groups.first %}
+                                    <span class="badge bg-primary">{{ user_obj.groups.first.name }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">No Role</span>
+                                    {% endif %}
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Status:</small>
+                                    {% if user_obj != user and not user_obj.is_superuser %}
+                                    <form method="post" action="{% url 'user_toggle_status' user_obj.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="btn btn-sm btn-{% if user_obj.is_active %}success{% else %}secondary{% endif %}"
+                                                onclick="return confirm('Change user status?')">
+                                            {{ user_obj.is_active|yesno:'Active,Inactive' }}
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <span class="badge bg-{% if user_obj.is_active %}success{% else %}secondary{% endif %}">
+                                        {{ user_obj.is_active|yesno:'Active,Inactive' }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Last Login:</small>
+                                    <small>{{ user_obj.last_login|date:"d M Y H:i"|default:"Never" }}</small>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Joined:</small>
+                                    <small>{{ user_obj.date_joined|date:"d M Y" }}</small>
+                                </div>
+                            </div>
+                            
+                            <div class="btn-group w-100" role="group">
+                                <a href="{% url 'user_detail' user_obj.id %}" class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'user_edit' user_obj.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'user_reset_password' user_obj.id %}" class="btn btn-sm btn-outline-warning">
+                                    <i class="fas fa-key"></i>
+                                </a>
+                                {% if user_obj != user and not user_obj.is_superuser %}
+                                <a href="{% url 'user_delete' user_obj.id %}" class="btn btn-sm btn-outline-danger"
+                                   onclick="return confirm('Delete user {{ user_obj.username }}?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.role %}&role={{ request.GET.role }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.role %}&role={{ request.GET.role }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Previous</a>
+                </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.role %}&role={{ request.GET.role }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.role %}&role={{ request.GET.role }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.role %}&role={{ request.GET.role }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Last</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        
+        {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-5">
+            <div class="mb-4">
+                <i class="fas fa-users fa-4x text-muted"></i>
+            </div>
+            <h4 class="text-muted mb-3">No Users Found</h4>
+            <p class="text-muted mb-4">
+                {% if request.GET.q or request.GET.role or request.GET.status %}
+                    No users match your search criteria.
+                {% else %}
+                    Start by adding your first system user.
+                {% endif %}
+            </p>
+            <a href="{% url 'user_create' %}" class="btn btn-primary btn-lg">
+                <i class="fas fa-user-plus"></i> Add Your First User
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mt-4">
+    <div class="col-md-3 col-6 mb-3">
+        <div class="dashboard-card">
+            <div class="card-body text-center stat-card">
+                <div class="stat-icon bg-primary">
+                    <i class="fas fa-users text-white"></i>
+                </div>
+                <div class="stat-number text-primary">{{ total_users|default:0 }}</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="dashboard-card">
+            <div class="card-body text-center stat-card">
+                <div class="stat-icon bg-success">
+                    <i class="fas fa-user-check text-white"></i>
+                </div>
+                <div class="stat-number text-success">{{ active_users_count|default:0 }}</div>
+                <div class="stat-label">Active Users</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="dashboard-card">
+            <div class="card-body text-center stat-card">
+                <div class="stat-icon bg-warning">
+                    <i class="fas fa-user-shield text-white"></i>
+                </div>
+                <div class="stat-number text-warning">{{ superusers_count|default:0 }}</div>
+                <div class="stat-label">Superusers</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="dashboard-card">
+            <div class="card-body text-center stat-card">
+                <div class="stat-icon bg-info">
+                    <i class="fas fa-user-clock text-white"></i>
+                </div>
+                <div class="stat-number text-info">{{ recent_logins|default:0 }}</div>
+                <div class="stat-label">Active Today</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.stat-card {
+    text-align: center;
+    padding: 1.5rem 1rem;
+}
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    font-size: 1.5rem;
+}
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+}
+.stat-label {
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.user-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-left: 4px solid #0d6efd !important;
+}
+
+.user-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+    .stat-number {
+        font-size: 1.5rem;
+    }
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Bulk selection
+    const tableSelectAll = document.getElementById('tableSelectAll');
+    const selectAll = document.getElementById('selectAll');
+    const userCheckboxes = document.querySelectorAll('.user-checkbox:not(:disabled)');
+    
+    function updateSelectAllCheckbox() {
+        const enabledCheckboxes = Array.from(document.querySelectorAll('.user-checkbox:not(:disabled)'));
+        const allChecked = enabledCheckboxes.length > 0 && 
+                          enabledCheckboxes.every(cb => cb.checked);
+        const anyChecked = enabledCheckboxes.some(cb => cb.checked);
+        
+        if (tableSelectAll) {
+            tableSelectAll.checked = allChecked;
+            tableSelectAll.indeterminate = anyChecked && !allChecked;
+        }
+        if (selectAll) {
+            selectAll.checked = allChecked;
+            selectAll.indeterminate = anyChecked && !allChecked;
+        }
+    }
+    
+    if (tableSelectAll) {
+        tableSelectAll.addEventListener('change', function(e) {
+            userCheckboxes.forEach(cb => cb.checked = e.target.checked);
+        });
+    }
+    
+    if (selectAll) {
+        selectAll.addEventListener('change', function(e) {
+            userCheckboxes.forEach(cb => cb.checked = e.target.checked);
+        });
+    }
+    
+    userCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelectAllCheckbox);
+    });
+    
+    // Bulk actions
+    const bulkActivate = document.getElementById('bulkActivate');
+    const bulkDeactivate = document.getElementById('bulkDeactivate');
+    const bulkDelete = document.getElementById('bulkDelete');
+    const bulkResetPassword = document.getElementById('bulkResetPassword');
+    
+    function getSelectedUserIds() {
+        return Array.from(document.querySelectorAll('.user-checkbox:checked:not(:disabled)'))
+            .map(cb => cb.value);
+    }
+    
+    function performBulkAction(action, confirmMessage, url) {
+        const selectedIds = getSelectedUserIds();
+        
+        if (selectedIds.length === 0) {
+            alert('Please select at least one user');
+            return;
+        }
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = url;
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfToken) {
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrfToken.value;
+            form.appendChild(csrfInput);
+        }
+        
+        selectedIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'user_ids';
+            input.value = id;
+            form.appendChild(input);
+        });
+        
+        const nextInput = document.createElement('input');
+        nextInput.type = 'hidden';
+        nextInput.name = 'next';
+        nextInput.value = window.location.href;
+        form.appendChild(nextInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+    
+    if (bulkActivate) {
+        bulkActivate.addEventListener('click', function() {
+            performBulkAction(
+                'activate',
+                'Activate selected users?',
+                '{% url "user_bulk_activate" %}'
+            );
+        });
+    }
+    
+    if (bulkDeactivate) {
+        bulkDeactivate.addEventListener('click', function() {
+            performBulkAction(
+                'deactivate',
+                'Deactivate selected users?',
+                '{% url "user_bulk_deactivate" %}'
+            );
+        });
+    }
+    
+    if (bulkDelete) {
+        bulkDelete.addEventListener('click', function() {
+            performBulkAction(
+                'delete',
+                'Delete selected users? This action cannot be undone.',
+                '{% url "user_bulk_delete" %}'
+            );
+        });
+    }
+    
+    if (bulkResetPassword) {
+        bulkResetPassword.addEventListener('click', function() {
+            const selectedIds = getSelectedUserIds();
+            
+            if (selectedIds.length === 0) {
+                alert('Please select at least one user');
+                return;
+            }
+            
+            if (selectedIds.length > 1) {
+                alert('Please select only one user to reset password');
+                return;
+            }
+            
+            window.location.href = `/system-admin/users/${selectedIds[0]}/reset-password/`;
+        });
+    }
+    
+    // Search form clear button
+    const searchInput = document.querySelector('input[name="q"]');
+    const searchForm = document.querySelector('form');
+    
+    if (searchInput && searchForm) {
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'btn btn-outline-secondary btn-sm';
+        clearBtn.innerHTML = '<i class="fas fa-times"></i>';
+        clearBtn.style.position = 'absolute';
+        clearBtn.style.right = '10px';
+        clearBtn.style.top = '50%';
+        clearBtn.style.transform = 'translateY(-50%)';
+        clearBtn.style.display = searchInput.value ? 'block' : 'none';
+        
+        searchInput.parentElement.style.position = 'relative';
+        searchInput.style.paddingRight = '40px';
+        searchInput.parentElement.appendChild(clearBtn);
+        
+        clearBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            clearBtn.style.display = 'none';
+            searchForm.submit();
+        });
+        
+        searchInput.addEventListener('input', function() {
+            clearBtn.style.display = this.value ? 'block' : 'none';
+        });
+    }
+});
+</script>
+{% endblock %}

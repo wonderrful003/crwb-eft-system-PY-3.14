@@ -1,0 +1,630 @@
+{% extends 'base.html' %}
+
+{% block title %}Accounts Dashboard - CRWB EFT{% endblock %}
+{% block page_title %}Accounts Personnel Dashboard{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item active">Dashboard</li>
+{% endblock %}
+
+{% block sidebar_menu %}
+<li>
+    <a href="{% url 'accounts_dashboard' %}" class="active">
+        <i class="fas fa-tachometer-alt"></i>
+        <span>Dashboard</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'create_batch' %}">
+        <i class="fas fa-plus-circle"></i>
+        <span>Create Batch</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'batch_list' %}">
+        <i class="fas fa-list"></i>
+        <span>All Batches</span>
+    </a>
+</li>
+<li class="sidebar-divider"></li>
+<li class="sidebar-header">Filter by Status</li>
+<li>
+    <a href="{% url 'batch_list' %}?status=DRAFT">
+        <i class="fas fa-edit"></i>
+        <span>Draft Batches</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'batch_list' %}?status=PENDING">
+        <i class="fas fa-clock"></i>
+        <span>Pending Approval</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'batch_list' %}?status=APPROVED">
+        <i class="fas fa-check-circle"></i>
+        <span>Approved Batches</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'batch_list' %}?status=REJECTED">
+        <i class="fas fa-times-circle"></i>
+        <span>Rejected Batches</span>
+    </a>
+</li>
+{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'create_batch' %}" class="btn btn-primary">
+    <i class="fas fa-plus-circle"></i> Create New Batch
+</a>
+{% endblock %}
+
+{% block page_css %}
+<style>
+/* ===== DASHBOARD STYLING ===== */
+.dashboard-welcome {
+    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-lg);
+    border: 3px solid var(--water-cyan);
+}
+
+.dashboard-welcome h2 {
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    font-size: 1.75rem;
+}
+
+.dashboard-welcome p {
+    opacity: 0.95;
+    margin-bottom: 0;
+    font-size: 1.05rem;
+}
+
+.current-date {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.6rem 1.2rem;
+    border-radius: 50px;
+    font-size: 0.95rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: inline-block;
+}
+
+/* ===== STAT CARDS ===== */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 1.75rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: var(--transition-base);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.stat-icon {
+    font-size: 2.25rem;
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    width: 70px;
+    height: 70px;
+    box-shadow: var(--shadow-md);
+}
+
+.stat-total { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.stat-draft { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+.stat-pending { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.stat-approved { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+.stat-rejected { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+
+.stat-number {
+    font-size: 2.75rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+    letter-spacing: -1px;
+}
+
+.stat-label {
+    font-size: 1rem;
+    color: var(--gray-600);
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.stat-link {
+    font-size: 0.9rem;
+    color: var(--primary-blue);
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: var(--transition-fast);
+}
+
+.stat-link:hover {
+    color: var(--primary-blue-dark);
+    transform: translateX(3px);
+}
+
+/* ===== QUICK ACTIONS ===== */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.action-btn {
+    background: var(--white);
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    transition: var(--transition-base);
+    text-decoration: none;
+    color: var(--gray-800);
+    box-shadow: var(--shadow-sm);
+}
+
+.action-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-blue);
+    color: var(--gray-800);
+}
+
+.action-icon {
+    font-size: 1.75rem;
+    color: white;
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
+}
+
+.action-create { background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%); }
+.action-view { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+
+.action-content {
+    flex: 1;
+}
+
+.action-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin-bottom: 0.35rem;
+    color: var(--gray-800);
+}
+
+.action-desc {
+    font-size: 0.9rem;
+    color: var(--gray-600);
+}
+
+/* ===== RECENT BATCHES SECTION ===== */
+.batch-section {
+    margin-top: 2.5rem;
+}
+
+.batch-section h4 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--gray-800);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.batch-section h4 i {
+    color: var(--primary-blue);
+}
+
+.dashboard-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    overflow: hidden;
+}
+
+.card-body {
+    padding: 0;
+}
+
+/* Enhanced table styling */
+.table {
+    margin-bottom: 0;
+}
+
+.table thead th {
+    background: var(--gray-50);
+    color: var(--gray-700);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.3px;
+    border-bottom: 2px solid var(--gray-300);
+    padding: 1rem;
+}
+
+.table tbody tr {
+    transition: var(--transition-fast);
+}
+
+.table tbody tr:hover {
+    background: var(--gray-50);
+}
+
+.table tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+}
+
+/* Status badges */
+.status-badge {
+    padding: 0.4rem 0.9rem;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    display: inline-block;
+}
+
+.status-draft {
+    background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+    color: #8b6914;
+}
+
+.status-pending {
+    background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+    color: #fff;
+}
+
+.status-approved {
+    background: linear-gradient(135deg, #55efc4 0%, #00b894 100%);
+    color: #00563f;
+}
+
+.status-rejected {
+    background: linear-gradient(135deg, #ff7675 0%, #d63031 100%);
+    color: #fff;
+}
+
+.status-exported {
+    background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+    color: #fff;
+}
+
+/* Table action buttons */
+.table-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-view,
+.btn-edit,
+.btn-download {
+    padding: 0.45rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: var(--transition-fast);
+    border: none;
+}
+
+.btn-view {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+}
+
+.btn-view:hover {
+    background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-edit {
+    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+    color: white;
+}
+
+.btn-edit:hover {
+    background: linear-gradient(135deg, var(--primary-blue-dark) 0%, #003d7a 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-download {
+    background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+    color: white;
+}
+
+.btn-download:hover {
+    background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Table cell padding for actions */
+.table tbody td {
+    vertical-align: middle;
+}
+
+.table .text-center {
+    min-width: 180px;
+}
+
+/* Sidebar customizations for accounts */
+.sidebar-divider {
+    height: 1px;
+    background: var(--gray-200);
+    margin: 1rem 0;
+}
+
+.sidebar-header {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--gray-500);
+    letter-spacing: 0.5px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .dashboard-welcome {
+        text-align: center;
+    }
+    
+    .current-date {
+        margin-top: 1rem;
+    }
+    
+    .stat-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Stack action buttons vertically on mobile */
+    .table-actions {
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+    
+    .btn-view,
+    .btn-edit,
+    .btn-download {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* Make table scrollable on mobile */
+    .batch-section .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .batch-section .table {
+        min-width: 800px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Welcome Banner -->
+<div class="dashboard-welcome">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h2><i class="fas fa-hand-wave me-2"></i> Welcome back, {{ user.get_full_name|default:user.username }}!</h2>
+            <p>Here's an overview of your EFT batches. Total batches: <strong>{{ stats.total_batches }}</strong></p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <div class="current-date">
+                <i class="fas fa-calendar-alt me-2"></i><span id="current-date"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-icon stat-total"><i class="fas fa-layer-group"></i></div>
+        <div class="stat-number">{{ stats.total_batches }}</div>
+        <div class="stat-label">Total Batches</div>
+        <a href="{% url 'batch_list' %}" class="stat-link">
+            <i class="fas fa-arrow-right"></i> View All Batches
+        </a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-draft"><i class="fas fa-edit"></i></div>
+        <div class="stat-number">{{ stats.draft_batches }}</div>
+        <div class="stat-label">Draft Batches</div>
+        <a href="{% url 'batch_list' %}?status=DRAFT" class="stat-link">
+            <i class="fas fa-arrow-right"></i> Edit Drafts
+        </a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-pending"><i class="fas fa-clock"></i></div>
+        <div class="stat-number">{{ stats.pending_batches }}</div>
+        <div class="stat-label">Pending Approval</div>
+        <a href="{% url 'batch_list' %}?status=PENDING" class="stat-link">
+            <i class="fas fa-arrow-right"></i> View Pending
+        </a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-approved"><i class="fas fa-check-circle"></i></div>
+        <div class="stat-number">{{ stats.approved_batches }}</div>
+        <div class="stat-label">Approved Batches</div>
+        <a href="{% url 'batch_list' %}?status=APPROVED" class="stat-link">
+            <i class="fas fa-arrow-right"></i> View Approved
+        </a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-rejected"><i class="fas fa-times-circle"></i></div>
+        <div class="stat-number">{{ stats.rejected_batches }}</div>
+        <div class="stat-label">Rejected Batches</div>
+        <a href="{% url 'batch_list' %}?status=REJECTED" class="stat-link">
+            <i class="fas fa-arrow-right"></i> View Rejected
+        </a>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="action-grid">
+    <a href="{% url 'create_batch' %}" class="action-btn">
+        <div class="action-icon action-create"><i class="fas fa-plus-circle"></i></div>
+        <div class="action-content">
+            <div class="action-title">Create New Batch</div>
+            <div class="action-desc">Start a new EFT batch quickly</div>
+        </div>
+    </a>
+    <a href="{% url 'batch_list' %}" class="action-btn">
+        <div class="action-icon action-view"><i class="fas fa-list"></i></div>
+        <div class="action-content">
+            <div class="action-title">View All Batches</div>
+            <div class="action-desc">Browse and manage existing batches</div>
+        </div>
+    </a>
+</div>
+
+<!-- Recent Batches Table -->
+<div class="batch-section">
+    <h4><i class="fas fa-history"></i> Recent Batches</h4>
+    
+    <div class="dashboard-card">
+        <div class="card-body">
+            {% if recent_batches %}
+            <div class="table-responsive">
+                <table class="table table-hover data-table">
+                    <thead>
+                        <tr>
+                            <th>Batch Reference</th>
+                            <th>Batch Name</th>
+                            <th>Created On</th>
+                            <th>Status</th>
+                            <th>Records</th>
+                            <th>Amount (MWK)</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for batch in recent_batches %}
+                        <tr>
+                            <td><strong>{{ batch.batch_reference }}</strong></td>
+                            <td>{{ batch.batch_name }}</td>
+                            <td>{{ batch.created_at|date:"d M Y H:i" }}</td>
+                            <td>
+                                <span class="status-badge status-{{ batch.status|lower }}">
+                                    {{ batch.get_status_display }}
+                                </span>
+                            </td>
+                            <td><strong>{{ batch.record_count }}</strong></td>
+                            <td><strong>{{ batch.total_amount|floatformat:2 }}</strong></td>
+                            <td class="text-center">
+                                <div class="table-actions">
+                                    {% if batch.status == 'DRAFT' %}
+                                    <a href="{% url 'edit_batch' batch.id %}" class="btn-edit">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </a>
+                                    {% elif batch.status == 'APPROVED' %}
+                                    <a href="{% url 'view_batch' batch.id %}" class="btn-view">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                    <a href="{% url 'export_batch' batch.id 'txt' %}" class="btn-download">
+                                        <i class="fas fa-download"></i> Export
+                                    </a>
+                                    {% else %}
+                                    <a href="{% url 'view_batch' batch.id %}" class="btn-view">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info mb-0">
+                <i class="fas fa-info-circle"></i>
+                <span>No recent batches found. <a href="{% url 'create_batch' %}" class="alert-link">Create your first batch</a></span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Update current date
+    function updateCurrentDate() {
+        const now = new Date();
+        const options = { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        };
+        $('#current-date').text(now.toLocaleDateString('en-GB', options));
+    }
+    updateCurrentDate();
+});
+</script>
+{% endblock %}

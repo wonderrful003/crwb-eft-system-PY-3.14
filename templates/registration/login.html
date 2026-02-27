@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - CRWB EFT System</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        /* Using the same CSS variables from base template */
+        :root {
+            --primary-blue: #0066cc;
+            --primary-blue-dark: #004d99;
+            --primary-blue-light: #3385d6;
+            --water-cyan: #00b4d8;
+            --water-teal: #0096c7;
+            --gray-50: #f8f9fa;
+            --gray-100: #e9ecef;
+            --gray-200: #dee2e6;
+            --gray-300: #ced4da;
+            --gray-400: #adb5bd;
+            --gray-500: #6c757d;
+            --gray-600: #495057;
+            --gray-700: #343a40;
+            --gray-800: #212529;
+            --white: #ffffff;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.12);
+            --transition-base: 0.3s ease;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray-700);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 450px;
+            margin: 0 auto;
+        }
+
+        .login-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            border: 1px solid var(--gray-200);
+            transition: var(--transition-base);
+        }
+
+        .login-card:hover {
+            box-shadow: 0 15px 30px rgba(0, 102, 204, 0.15);
+        }
+
+        .login-header {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+            color: var(--white);
+            padding: 2rem 2rem 1.5rem;
+            text-align: center;
+            border-bottom: 3px solid var(--water-cyan);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 1.5rem;
+        }
+
+        .login-logo {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            background: var(--white);
+            padding: 8px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition-base);
+        }
+
+        .login-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .logo-text {
+            text-align: left;
+            line-height: 1.2;
+        }
+
+        .logo-text h3 {
+            margin: 0;
+            font-weight: 700;
+            font-size: 1.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-text p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 0.9rem;
+            color: var(--water-cyan);
+        }
+
+        .login-tagline {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-top: 0.5rem;
+            font-weight: 500;
+        }
+
+        .login-body {
+            padding: 2.5rem 2rem;
+        }
+
+        .login-title {
+            text-align: center;
+            color: var(--gray-800);
+            font-weight: 700;
+            font-size: 1.35rem;
+            margin-bottom: 2rem;
+            letter-spacing: -0.3px;
+        }
+
+        /* Alerts matching base template */
+        .alert {
+            border-radius: var(--radius-md);
+            border: none;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .alert i {
+            font-size: 1.25rem;
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, rgba(220, 53, 69, 0.12) 0%, rgba(200, 35, 51, 0.08) 100%);
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.12) 0%, rgba(33, 136, 56, 0.08) 100%);
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, rgba(23, 162, 184, 0.12) 0%, rgba(19, 132, 150, 0.08) 100%);
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+
+        /* Form styles matching base template */
+        .form-label {
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .input-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .input-group-text {
+            background: var(--gray-50);
+            border: 2px solid var(--gray-300);
+            border-right: none;
+            color: var(--gray-600);
+            padding: 0.65rem 1rem;
+            transition: var(--transition-base);
+        }
+
+        .form-control {
+            border: 2px solid var(--gray-300);
+            border-radius: var(--radius-md);
+            padding: 0.65rem 1rem;
+            transition: var(--transition-base);
+            font-size: 0.95rem;
+            border-left: none;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.1);
+        }
+
+        .form-check {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-check-input {
+            width: 1.1em;
+            height: 1.1em;
+            margin-top: 0.2em;
+            border: 2px solid var(--gray-400);
+        }
+
+        .form-check-input:checked {
+            background-color: var(--primary-blue);
+            border-color: var(--primary-blue);
+        }
+
+        .form-check-input:focus {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25);
+        }
+
+        .form-check-label {
+            color: var(--gray-600);
+            font-size: 0.9rem;
+        }
+
+        /* Button matching base template */
+        .btn-login {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+            color: var(--white);
+            border-radius: var(--radius-md);
+            padding: 0.75rem;
+            font-weight: 600;
+            transition: var(--transition-base);
+            border: none;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: var(--shadow-md);
+            width: 100%;
+        }
+
+        .btn-login:hover {
+            background: linear-gradient(135deg, var(--primary-blue-dark) 0%, #003d7a 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 102, 204, 0.3);
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
+        }
+
+        .login-footer {
+            background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);
+            text-align: center;
+            padding: 1.5rem;
+            border-top: 2px solid var(--gray-200);
+            color: var(--gray-600);
+        }
+
+        .login-footer i {
+            margin: 0 5px;
+        }
+
+        .text-success {
+            color: #28a745 !important;
+        }
+
+        .text-warning {
+            color: #ffc107 !important;
+        }
+
+        .support-info {
+            text-align: center;
+            margin-top: 1.5rem;
+            color: var(--gray-600);
+            font-size: 0.9rem;
+        }
+
+        .support-info i {
+            color: var(--primary-blue);
+            margin-right: 5px;
+        }
+
+        /* Animation from base template */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-card {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 576px) {
+            .login-container {
+                padding: 0 15px;
+            }
+            
+            .login-header {
+                padding: 1.5rem 1.5rem 1rem;
+            }
+            
+            .logo-container {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+            
+            .logo-text {
+                text-align: center;
+            }
+            
+            .login-logo {
+                width: 70px;
+                height: 70px;
+            }
+            
+            .login-body {
+                padding: 2rem 1.5rem;
+            }
+            
+            .login-title {
+                font-size: 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <div class="logo-container">
+                <div class="login-logo">
+                    <img src="https://crwb.mw/media/img/logo.png" 
+                         alt="CRWB Logo" 
+                         onerror="this.onerror=null; 
+                                  this.style.display='none'; 
+                                  this.parentElement.innerHTML='<i class=\'fas fa-droplet fa-2x text-primary\'></i>';">
+                </div>
+                <div class="logo-text">
+                    <h3>CRWB EFT System</h3>
+                    <p>Central Region Water Board</p>
+                </div>
+            </div>
+            <div class="login-tagline">
+                Electronic Funds Transfer System
+            </div>
+        </div>
+            
+            <div class="login-body">
+                <h4 class="login-title">Sign In to Continue</h4>
+                
+                <!-- Display error messages -->
+                {% if form.errors %}
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Login Failed!</strong> Invalid username or password.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+                
+                {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+                
+                <form method="post" action="{% url 'login' %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="username" class="form-label">
+                            <i class="fas fa-user"></i> Username
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-user"></i>
+                            </span>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="username" 
+                                name="username" 
+                                placeholder="Enter your username"
+                                required 
+                                autofocus
+                            >
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">
+                            <i class="fas fa-lock"></i> Password
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-lock"></i>
+                            </span>
+                            <input 
+                                type="password" 
+                                class="form-control" 
+                                id="password" 
+                                name="password" 
+                                placeholder="Enter your password"
+                                required
+                            >
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4 form-check">
+                        <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                        <label class="form-check-label" for="remember">
+                            Remember me
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-login">
+                        <i class="fas fa-sign-in-alt"></i> Sign In
+                    </button>
+                    
+                    <input type="hidden" name="next" value="{{ next }}">
+                </form>
+            </div>
+            
+            <div class="login-footer">
+                <p class="mb-2">
+                    <i class="fas fa-shield-alt text-success"></i> Secure Login | 
+                    <i class="fas fa-lock text-warning"></i> Encrypted Connection
+                </p>
+                <small class="text-muted">
+                    &copy; {% now "Y" %} Central Region Water Board. All rights reserved.
+                </small>
+            </div>
+        </div>
+        
+        <div class="support-info">
+            <i class="fas fa-info-circle"></i> 
+            <span>For support, contact IT Department</span>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-hide alerts
+            setTimeout(() => {
+                const alerts = document.querySelectorAll('.alert');
+                alerts.forEach(alert => {
+                    alert.style.transition = 'opacity 0.5s ease';
+                    alert.style.opacity = '0';
+                    setTimeout(() => {
+                        if (alert.parentNode) {
+                            alert.parentNode.removeChild(alert);
+                        }
+                    }, 500);
+                });
+            }, 5000);
+
+            // Focus on username field
+            document.getElementById('username')?.focus();
+        });
+    </script>
+</body>
+</html>

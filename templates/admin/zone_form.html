@@ -1,0 +1,70 @@
+<!-- eft_app/templates/admin/zone_form.html -->
+{% extends 'base.html' %}
+
+{% block title %}{% if form.instance.pk %}Edit{% else %}Add{% endif %} Zone{% endblock %}
+
+{% block page_title %}{% if form.instance.pk %}Edit{% else %}Add New{% endif %} Zone{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{% url 'zone_list' %}">Zones</a></li>
+<li class="breadcrumb-item active">{% if form.instance.pk %}Edit{% else %}Add{% endif %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-map-marker-alt"></i> Zone Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.zone_code.id_for_label }}" class="form-label">
+                            Zone Code <span class="text-danger">*</span>
+                        </label>
+                        {{ form.zone_code }}
+                        {% if form.zone_code.errors %}
+                        <div class="text-danger small">{{ form.zone_code.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.zone_name.id_for_label }}" class="form-label">
+                            Zone Name <span class="text-danger">*</span>
+                        </label>
+                        {{ form.zone_name }}
+                        {% if form.zone_name.errors %}
+                        <div class="text-danger small">{{ form.zone_name.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">
+                            Description
+                        </label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                        <div class="text-danger small">{{ form.description.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'zone_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Zone
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

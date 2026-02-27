@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if form.instance.pk %}Edit{% else %}Add{% endif %} Debit Account{% endblock %}
+
+{% block page_title %}{% if form.instance.pk %}Edit{% else %}Add New{% endif %} Debit Account{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{% url 'debit_account_list' %}">Debit Accounts</a></li>
+<li class="breadcrumb-item active">{% if form.instance.pk %}Edit{% else %}Add{% endif %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-credit-card"></i> Debit Account Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.account_number.id_for_label }}" class="form-label">
+                            Account Number <span class="text-danger">*</span>
+                        </label>
+                        {{ form.account_number }}
+                        <small class="form-text text-muted">
+                            RBM Account only (e.g., 13006161244)
+                        </small>
+                        {% if form.account_number.errors %}
+                        <div class="text-danger small">{{ form.account_number.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.account_name.id_for_label }}" class="form-label">
+                            Account Name <span class="text-danger">*</span>
+                        </label>
+                        {{ form.account_name }}
+                        <small class="form-text text-muted">
+                            Debit Account Name (e.g., (ORT) MG Other Recurrent Expenditure A/C)
+                        </small>
+                        {% if form.account_name.errors %}
+                        <div class="text-danger small">{{ form.account_name.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">
+                            Description
+                        </label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                        <div class="text-danger small">{{ form.description.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.is_active }}
+                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                Active
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'debit_account_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Debit Account
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

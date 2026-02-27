@@ -1,0 +1,166 @@
+<!-- eft_app/templates/admin/supplier_form.html -->
+{% extends 'base.html' %}
+
+{% block title %}{% if form.instance.pk %}Edit{% else %}Add{% endif %} Supplier{% endblock %}
+
+{% block page_title %}{% if form.instance.pk %}Edit{% else %}Add New{% endif %} Supplier{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{% url 'supplier_list' %}">Suppliers</a></li>
+<li class="breadcrumb-item active">{% if form.instance.pk %}Edit{% else %}Add{% endif %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-truck"></i> Supplier Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.supplier_code.id_for_label }}" class="form-label">
+                                Supplier Code <span class="text-danger">*</span>
+                            </label>
+                            {{ form.supplier_code }}
+                            <small class="form-text text-muted">
+                                7-digit vendor code (e.g., 57819)
+                            </small>
+                            {% if form.supplier_code.errors %}
+                            <div class="text-danger small">{{ form.supplier_code.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.supplier_name.id_for_label }}" class="form-label">
+                                Supplier Name <span class="text-danger">*</span>
+                            </label>
+                            {{ form.supplier_name }}
+                            {% if form.supplier_name.errors %}
+                            <div class="text-danger small">{{ form.supplier_name.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.bank.id_for_label }}" class="form-label">
+                                Bank <span class="text-danger">*</span>
+                            </label>
+                            {{ form.bank }}
+                            {% if form.bank.errors %}
+                            <div class="text-danger small">{{ form.bank.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.account_number.id_for_label }}" class="form-label">
+                                Account Number <span class="text-danger">*</span>
+                            </label>
+                            {{ form.account_number }}
+                            <small class="form-text text-muted">
+                                Beneficiary Bank Account Number
+                            </small>
+                            {% if form.account_number.errors %}
+                            <div class="text-danger small">{{ form.account_number.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.account_name.id_for_label }}" class="form-label">
+                            Account Name <span class="text-danger">*</span>
+                        </label>
+                        {{ form.account_name }}
+                        <small class="form-text text-muted">
+                            Payee Details/Beneficiary Name
+                        </small>
+                        {% if form.account_name.errors %}
+                        <div class="text-danger small">{{ form.account_name.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.employee_number.id_for_label }}" class="form-label">
+                                Employee Number
+                            </label>
+                            {{ form.employee_number }}
+                            <small class="form-text text-muted">
+                                UDF2 at UBS (Optional)
+                            </small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.national_id.id_for_label }}" class="form-label">
+                                National ID
+                            </label>
+                            {{ form.national_id }}
+                            <small class="form-text text-muted">
+                                UDF3 at UBS (Optional)
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.credit_reference.id_for_label }}" class="form-label">
+                                Credit Reference
+                            </label>
+                            {{ form.credit_reference }}
+                            <small class="form-text text-muted">
+                                Payees Reference/Invoice Number
+                            </small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.cost_center.id_for_label }}" class="form-label">
+                                Cost Center
+                            </label>
+                            {{ form.cost_center }}
+                            <small class="form-text text-muted">
+                                Originating Cost/Funds Centre
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.source.id_for_label }}" class="form-label">
+                            Source Reference
+                        </label>
+                        {{ form.source }}
+                        <small class="form-text text-muted">
+                            Unique reference from IFMIS
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.is_active }}
+                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                Active
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'supplier_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Supplier
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

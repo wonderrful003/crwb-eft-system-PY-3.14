@@ -1,0 +1,611 @@
+{% extends 'base.html' %}
+
+{% block title %}Schemes{% endblock %}
+
+{% block page_title %}Scheme Management{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item active">Schemes</li>
+{% endblock %}
+
+{% block sidebar_menu %}
+<li><a href="{% url 'admin_dashboard' %}"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+<li><a href="{% url 'user_list' %}"><i class="fas fa-users"></i> <span>Users</span></a></li>
+<li><a href="{% url 'bank_list' %}"><i class="fas fa-university"></i> <span>Banks</span></a></li>
+<li><a href="{% url 'zone_list' %}"><i class="fas fa-map-marker-alt"></i> <span>Zones</span></a></li>
+<li><a href="{% url 'scheme_list' %}" class="active"><i class="fas fa-project-diagram"></i> <span>Schemes</span></a></li>
+<li><a href="{% url 'supplier_list' %}"><i class="fas fa-truck"></i> <span>Suppliers</span></a></li>
+<li><a href="{% url 'debit_account_list' %}"><i class="fas fa-credit-card"></i> <span>Debit Accounts</span></a></li>
+{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'scheme_add' %}" class="btn btn-success">
+    <i class="fas fa-plus-circle"></i> Add New Scheme
+</a>
+<div class="btn-group">
+    <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="fas fa-download"></i> Export
+    </button>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{% url 'scheme_export' %}?format=csv">CSV</a></li>
+        <li><a class="dropdown-item" href="{% url 'scheme_export' %}?format=excel">Excel</a></li>
+        <li><a class="dropdown-item" href="{% url 'scheme_export' %}?format=pdf">PDF</a></li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-project-diagram text-success"></i> All Schemes
+            </h5>
+            <div class="text-muted">
+                <span class="badge bg-light text-dark">{{ schemes.count }} schemes</span>
+            </div>
+        </div>
+        
+        <!-- Search and Filter Form -->
+        <form method="get" class="mt-3">
+            <div class="row g-2">
+                <div class="col-md-5">
+                    <input type="text" name="q" class="form-control" placeholder="Search by scheme name or code..." 
+                           value="{{ request.GET.q }}">
+                </div>
+                <div class="col-md-3">
+                    <select name="zone" class="form-select">
+                        <option value="">All Zones</option>
+                        {% for zone in all_zones %}
+                        <option value="{{ zone.id }}" {% if request.GET.zone == zone.id|stringformat:"i" %}selected{% endif %}>
+                            {{ zone.zone_code }} - {{ zone.zone_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="status" class="form-select">
+                        <option value="">All Status</option>
+                        <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success w-100">Search</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <div class="card-body">
+        <!-- Zone Filter Notification -->
+        {% if current_zone %}
+        <div class="alert alert-info mb-3">
+            <i class="fas fa-filter"></i>
+            Showing schemes for: <strong>{{ current_zone.zone_name }} ({{ current_zone.zone_code }})</strong>
+            <a href="{% url 'scheme_list' %}" class="btn btn-sm btn-outline-info ms-2">
+                <i class="fas fa-times"></i> Clear Filter
+            </a>
+        </div>
+        {% endif %}
+        
+        {% if schemes %}
+        <!-- Bulk Actions -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="selectAll">
+                <label class="form-check-label" for="selectAll">Select All</label>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-success" id="bulkActivate">Activate</button>
+                <button class="btn btn-sm btn-outline-warning" id="bulkDeactivate">Deactivate</button>
+                <button class="btn btn-sm btn-outline-danger" id="bulkDelete">Delete</button>
+            </div>
+        </div>
+        
+        <!-- Desktop Table View -->
+        <div class="d-none d-lg-block">
+            <div class="table-responsive">
+                <table class="table table-hover data-table">
+                    <thead>
+                        <tr>
+                            <th width="50">
+                                <input type="checkbox" class="form-check-input" id="tableSelectAll">
+                            </th>
+                            <th>#</th>
+                            <th>
+                                <a href="?sort=scheme_code&order={% if sort_field == 'scheme_code' and order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.zone %}&zone={{ request.GET.zone }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                                   class="text-decoration-none text-dark">
+                                    Scheme Code
+                                    {% if sort_field == 'scheme_code' %}
+                                    <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %}"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?sort=scheme_name&order={% if sort_field == 'scheme_name' and order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.zone %}&zone={{ request.GET.zone }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                                   class="text-decoration-none text-dark">
+                                    Scheme Name
+                                    {% if sort_field == 'scheme_name' %}
+                                    <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %}"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?sort=zone&order={% if sort_field == 'zone' and order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.zone %}&zone={{ request.GET.zone }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                                   class="text-decoration-none text-dark">
+                                    Zone
+                                    {% if sort_field == 'zone' %}
+                                    <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %}"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>Description</th>
+                            <th>
+                                <a href="?sort=is_active&order={% if sort_field == 'is_active' and order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.zone %}&zone={{ request.GET.zone }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                                   class="text-decoration-none text-dark">
+                                    Status
+                                    {% if sort_field == 'is_active' %}
+                                    <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %}"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>
+                                <a href="?sort=created_at&order={% if sort_field == 'created_at' and order == 'asc' %}desc{% else %}asc{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.zone %}&zone={{ request.GET.zone }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                                   class="text-decoration-none text-dark">
+                                    Created At
+                                    {% if sort_field == 'created_at' %}
+                                    <i class="fas fa-sort-{% if order == 'asc' %}up{% else %}down{% endif %}"></i>
+                                    {% else %}
+                                    <i class="fas fa-sort text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for scheme in schemes %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input scheme-checkbox" value="{{ scheme.pk }}">
+                            </td>
+                            <td>{{ forloop.counter }}</td>
+                            <td><strong>{{ scheme.scheme_code }}</strong></td>
+                            <td>{{ scheme.scheme_name }}</td>
+                            <td>
+                                <span class="badge bg-info">{{ scheme.zone.zone_code }}</span>
+                                <small class="text-muted">{{ scheme.zone.zone_name }}</small>
+                            </td>
+                            <td>
+                                {% if scheme.description %}
+                                    <span data-bs-toggle="tooltip" title="{{ scheme.description }}">
+                                        {{ scheme.description|truncatechars:50 }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">No description</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="post" action="{% url 'scheme_toggle_status' scheme.pk %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="btn btn-sm btn-{% if scheme.is_active %}success{% else %}secondary{% endif %}"
+                                            onclick="return confirm('Change scheme status to {% if scheme.is_active %}inactive{% else %}active{% endif %}?')">
+                                        {{ scheme.is_active|yesno:'Active,Inactive' }}
+                                    </button>
+                                </form>
+                            </td>
+                            <td>{{ scheme.created_at|date:"d M Y" }}</td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'scheme_detail' scheme.pk %}" class="btn btn-sm btn-outline-info" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'scheme_edit' scheme.pk %}" class="btn btn-sm btn-outline-primary" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'scheme_delete' scheme.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"
+                                       onclick="return confirm('Are you sure you want to delete this scheme? This action cannot be undone.')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Mobile Card View -->
+        <div class="d-lg-none">
+            <div class="row">
+                {% for scheme in schemes %}
+                <div class="col-12 mb-3">
+                    <div class="card border h-100 scheme-card">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-project-diagram text-success"></i>
+                                <strong>{{ scheme.scheme_code }}</strong>
+                            </div>
+                            <div class="btn-group">
+                                <a href="{% url 'scheme_detail' scheme.pk %}" class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'scheme_edit' scheme.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'scheme_delete' scheme.pk %}" class="btn btn-sm btn-outline-danger"
+                                   onclick="return confirm('Are you sure you want to delete this scheme?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="card-title">{{ scheme.scheme_name }}</h6>
+                            
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Zone:</small>
+                                    <span class="badge bg-info">{{ scheme.zone.zone_code }}</span>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Status:</small>
+                                    <form method="post" action="{% url 'scheme_toggle_status' scheme.pk %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" class="btn btn-sm btn-{% if scheme.is_active %}success{% else %}secondary{% endif %}"
+                                                onclick="return confirm('Change scheme status?')">
+                                            {{ scheme.is_active|yesno:'Active,Inactive' }}
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            
+                            {% if scheme.description %}
+                            <p class="small text-muted mb-3">
+                                <i class="fas fa-info-circle"></i>
+                                {{ scheme.description|truncatewords:15 }}
+                            </p>
+                            {% endif %}
+                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="far fa-clock"></i>
+                                    Created {{ scheme.created_at|date:"d M Y" }}
+                                </small>
+                                <a href="{% url 'zone_detail' scheme.zone.pk %}" class="btn btn-sm btn-outline-info">
+                                    View Zone
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.zone %}&zone={{ request.GET.zone }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.zone %}&zone={{ request.GET.zone }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Previous</a>
+                </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.zone %}&zone={{ request.GET.zone }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.zone %}&zone={{ request.GET.zone }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.zone %}&zone={{ request.GET.zone }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Last</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-5">
+            <div class="mb-4">
+                <i class="fas fa-project-diagram fa-4x text-muted"></i>
+            </div>
+            <h4 class="text-muted mb-3">No Schemes Found</h4>
+            <p class="text-muted mb-4">
+                {% if current_zone %}
+                    No schemes found for {{ current_zone.zone_name }}.
+                {% elif request.GET.q or request.GET.zone or request.GET.status %}
+                    No schemes match your search criteria.
+                {% else %}
+                    Start by adding your first scheme to organize EFT transactions.
+                {% endif %}
+            </p>
+            <a href="{% url 'scheme_add' %}" class="btn btn-success btn-lg">
+                <i class="fas fa-plus-circle"></i> Add Your First Scheme
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quick Statistics -->
+<div class="row mt-4">
+    <div class="col-md-3 col-6 mb-3">
+        <div class="dashboard-card">
+            <div class="card-body text-center stat-card">
+                <div class="stat-icon bg-success">
+                    <i class="fas fa-project-diagram text-white"></i>
+                </div>
+                <div class="stat-number text-success">{{ total_schemes|default:0 }}</div>
+                <div class="stat-label">Total Schemes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="dashboard-card">
+            <div class="card-body text-center stat-card">
+                <div class="stat-icon bg-info">
+                    <i class="fas fa-check-circle text-white"></i>
+                </div>
+                <div class="stat-number text-info">{{ active_schemes_count|default:0 }}</div>
+                <div class="stat-label">Active Schemes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="dashboard-card">
+            <div class="card-body text-center stat-card">
+                <div class="stat-icon bg-warning">
+                    <i class="fas fa-map-marker-alt text-white"></i>
+                </div>
+                <div class="stat-number text-warning">{{ zones_count|default:0 }}</div>
+                <div class="stat-label">Zones Covered</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="dashboard-card">
+            <div class="card-body text-center stat-card">
+                <div class="stat-icon bg-primary">
+                    <i class="fas fa-exchange-alt text-white"></i>
+                </div>
+                <div class="stat-number text-primary">{{ transactions_count|default:0 }}</div>
+                <div class="stat-label">Total Transactions</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    font-size: 1.5rem;
+}
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+}
+.stat-label {
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.scheme-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-left: 4px solid #198754 !important;
+}
+
+.scheme-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+    .stat-number {
+        font-size: 1.5rem;
+    }
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Bulk selection
+    const tableSelectAll = document.getElementById('tableSelectAll');
+    const selectAll = document.getElementById('selectAll');
+    const schemeCheckboxes = document.querySelectorAll('.scheme-checkbox');
+    
+    function updateSelectAllCheckbox() {
+        const allChecked = Array.from(schemeCheckboxes).every(cb => cb.checked);
+        const anyChecked = Array.from(schemeCheckboxes).some(cb => cb.checked);
+        
+        if (tableSelectAll) {
+            tableSelectAll.checked = allChecked;
+            tableSelectAll.indeterminate = anyChecked && !allChecked;
+        }
+        if (selectAll) {
+            selectAll.checked = allChecked;
+            selectAll.indeterminate = anyChecked && !allChecked;
+        }
+    }
+    
+    if (tableSelectAll) {
+        tableSelectAll.addEventListener('change', function(e) {
+            schemeCheckboxes.forEach(cb => cb.checked = e.target.checked);
+        });
+    }
+    
+    if (selectAll) {
+        selectAll.addEventListener('change', function(e) {
+            schemeCheckboxes.forEach(cb => cb.checked = e.target.checked);
+        });
+    }
+    
+    schemeCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelectAllCheckbox);
+    });
+    
+    // Bulk actions
+    const bulkActivate = document.getElementById('bulkActivate');
+    const bulkDeactivate = document.getElementById('bulkDeactivate');
+    const bulkDelete = document.getElementById('bulkDelete');
+    
+    function getSelectedSchemeIds() {
+        return Array.from(document.querySelectorAll('.scheme-checkbox:checked'))
+            .map(cb => cb.value);
+    }
+    
+    function performBulkAction(action, confirmMessage, url) {
+        const selectedIds = getSelectedSchemeIds();
+        
+        if (selectedIds.length === 0) {
+            alert('Please select at least one scheme');
+            return;
+        }
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = url;
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfToken) {
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrfToken.value;
+            form.appendChild(csrfInput);
+        }
+        
+        selectedIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'scheme_ids';
+            input.value = id;
+            form.appendChild(input);
+        });
+        
+        const nextInput = document.createElement('input');
+        nextInput.type = 'hidden';
+        nextInput.name = 'next';
+        nextInput.value = window.location.href;
+        form.appendChild(nextInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+    
+    if (bulkActivate) {
+        bulkActivate.addEventListener('click', function() {
+            performBulkAction(
+                'activate',
+                'Activate selected schemes?',
+                '{% url "scheme_bulk_activate" %}'
+            );
+        });
+    }
+    
+    if (bulkDeactivate) {
+        bulkDeactivate.addEventListener('click', function() {
+            performBulkAction(
+                'deactivate',
+                'Deactivate selected schemes?',
+                '{% url "scheme_bulk_deactivate" %}'
+            );
+        });
+    }
+    
+    if (bulkDelete) {
+        bulkDelete.addEventListener('click', function() {
+            performBulkAction(
+                'delete',
+                'Delete selected schemes? This action cannot be undone.',
+                '{% url "scheme_bulk_delete" %}'
+            );
+        });
+    }
+    
+    // Search form clear button
+    const searchInput = document.querySelector('input[name="q"]');
+    const searchForm = document.querySelector('form');
+    
+    if (searchInput && searchForm) {
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'btn btn-outline-secondary btn-sm';
+        clearBtn.innerHTML = '<i class="fas fa-times"></i>';
+        clearBtn.style.position = 'absolute';
+        clearBtn.style.right = '10px';
+        clearBtn.style.top = '50%';
+        clearBtn.style.transform = 'translateY(-50%)';
+        clearBtn.style.display = searchInput.value ? 'block' : 'none';
+        
+        searchInput.parentElement.style.position = 'relative';
+        searchInput.style.paddingRight = '40px';
+        searchInput.parentElement.appendChild(clearBtn);
+        
+        clearBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            clearBtn.style.display = 'none';
+            searchForm.submit();
+        });
+        
+        searchInput.addEventListener('input', function() {
+            clearBtn.style.display = this.value ? 'block' : 'none';
+        });
+    }
+});
+</script>
+{% endblock %}

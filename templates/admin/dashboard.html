@@ -1,0 +1,451 @@
+{% extends 'base.html' %}
+
+{% block title %}System Admin Dashboard - CRWB EFT{% endblock %}
+{% block page_title %}System Admin Dashboard{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item active">Dashboard</li>
+{% endblock %}
+
+{% block sidebar_menu %}
+<li>
+    <a href="{% url 'admin_dashboard' %}" class="active">
+        <i class="fas fa-tachometer-alt"></i>
+        <span>Dashboard</span>
+    </a>
+</li>
+<li class="sidebar-divider"></li>
+<li class="sidebar-header">Master Data</li>
+<li>
+    <a href="{% url 'user_list' %}">
+        <i class="fas fa-users"></i>
+        <span>Users</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'bank_list' %}">
+        <i class="fas fa-university"></i>
+        <span>Banks</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'zone_list' %}">
+        <i class="fas fa-map-marked-alt"></i>
+        <span>Zones</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'scheme_list' %}">
+        <i class="fas fa-project-diagram"></i>
+        <span>Schemes</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'supplier_list' %}">
+        <i class="fas fa-truck"></i>
+        <span>Suppliers</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'debit_account_list' %}">
+        <i class="fas fa-credit-card"></i>
+        <span>Debit Accounts</span>
+    </a>
+</li>
+<li class="sidebar-divider"></li>
+<li class="sidebar-header">System</li>
+<li>
+    <a href="/admin/" target="_blank">
+        <i class="fas fa-cog"></i>
+        <span>Django Admin</span>
+    </a>
+</li>
+{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'user_create' %}" class="btn btn-primary">
+    <i class="fas fa-user-plus"></i> Add User
+</a>
+{% endblock %}
+
+{% block page_css %}
+<style>
+/* ===== DASHBOARD STYLING ===== */
+.dashboard-welcome {
+    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-lg);
+    border: 3px solid var(--water-cyan);
+}
+
+.dashboard-welcome h2 {
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    font-size: 1.75rem;
+}
+
+.dashboard-welcome p {
+    opacity: 0.95;
+    margin-bottom: 0;
+    font-size: 1.05rem;
+}
+
+.current-date {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.6rem 1.2rem;
+    border-radius: 50px;
+    font-size: 0.95rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: inline-block;
+}
+
+/* ===== STAT CARDS ===== */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 1.75rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: var(--transition-base);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.stat-icon {
+    font-size: 2.25rem;
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    width: 70px;
+    height: 70px;
+    box-shadow: var(--shadow-md);
+}
+
+.stat-users { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.stat-banks { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+.stat-zones { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.stat-schemes { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+.stat-suppliers { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+.stat-accounts { background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); }
+
+.stat-number {
+    font-size: 2.75rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+    letter-spacing: -1px;
+}
+
+.stat-label {
+    font-size: 1rem;
+    color: var(--gray-600);
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.stat-link {
+    font-size: 0.9rem;
+    color: var(--primary-blue);
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: var(--transition-fast);
+}
+
+.stat-link:hover {
+    color: var(--primary-blue-dark);
+    transform: translateX(3px);
+}
+
+/* ===== SYSTEM STATUS SECTION ===== */
+.system-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.status-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+}
+
+.status-card h5 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--gray-800);
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.status-item:last-child {
+    border-bottom: none;
+}
+
+.status-label {
+    color: var(--gray-600);
+    font-size: 0.95rem;
+}
+
+.status-value {
+    font-weight: 700;
+    color: var(--gray-800);
+}
+
+.status-badge {
+    padding: 0.35rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.status-badge.status-online {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.status-offline {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Sidebar customizations */
+.sidebar-divider {
+    height: 1px;
+    background: var(--gray-200);
+    margin: 1rem 0;
+}
+
+.sidebar-header {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--gray-500);
+    letter-spacing: 0.5px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .dashboard-welcome {
+        text-align: center;
+    }
+    
+    .current-date {
+        margin-top: 1rem;
+    }
+    
+    .stat-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .system-status-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Welcome Banner -->
+<div class="dashboard-welcome">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h2><i class="fas fa-shield-alt me-2"></i> Welcome back, {{ user.get_full_name|default:user.username }}!</h2>
+            <p>System Administrator Dashboard - Manage users, master data, and system configuration</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <div class="current-date">
+                <i class="fas fa-calendar-alt me-2"></i><span id="current-date"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-icon stat-users"><i class="fas fa-users"></i></div>
+        <div class="stat-number">{{ stats.users_count }}</div>
+        <div class="stat-label">Total Users</div>
+        <a href="{% url 'user_list' %}" class="stat-link">
+            <i class="fas fa-arrow-right"></i> Manage Users
+        </a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-banks"><i class="fas fa-university"></i></div>
+        <div class="stat-number">{{ stats.banks_count }}</div>
+        <div class="stat-label">Banks</div>
+        <a href="{% url 'bank_list' %}" class="stat-link">
+            <i class="fas fa-arrow-right"></i> View Banks
+        </a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-zones"><i class="fas fa-map-marked-alt"></i></div>
+        <div class="stat-number">{{ stats.zones_count }}</div>
+        <div class="stat-label">Zones</div>
+        <a href="{% url 'zone_list' %}" class="stat-link">
+            <i class="fas fa-arrow-right"></i> View Zones
+        </a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-schemes"><i class="fas fa-project-diagram"></i></div>
+        <div class="stat-number">{{ stats.schemes_count }}</div>
+        <div class="stat-label">Schemes</div>
+        <a href="{% url 'scheme_list' %}" class="stat-link">
+            <i class="fas fa-arrow-right"></i> View Schemes
+        </a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-suppliers"><i class="fas fa-truck"></i></div>
+        <div class="stat-number">{{ stats.suppliers_count }}</div>
+        <div class="stat-label">Suppliers</div>
+        <a href="{% url 'supplier_list' %}" class="stat-link">
+            <i class="fas fa-arrow-right"></i> View Suppliers
+        </a>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon stat-accounts"><i class="fas fa-credit-card"></i></div>
+        <div class="stat-number">{{ stats.debit_accounts_count }}</div>
+        <div class="stat-label">Debit Accounts</div>
+        <a href="{% url 'debit_account_list' %}" class="stat-link">
+            <i class="fas fa-arrow-right"></i> View Accounts
+        </a>
+    </div>
+</div>
+
+<!-- System Status -->
+<div class="system-status-grid">
+    <div class="status-card">
+        <h5><i class="fas fa-server me-2 text-primary"></i> System Status</h5>
+        <div class="status-item">
+            <span class="status-label">Database</span>
+            {% if db_connected %}
+            <span class="status-badge status-online"><i class="fas fa-check-circle me-1"></i> Connected</span>
+            {% else %}
+            <span class="status-badge status-offline"><i class="fas fa-times-circle me-1"></i> Error</span>
+            {% endif %}
+        </div>
+        <div class="status-item">
+            <span class="status-label">System Uptime</span>
+            <span class="status-value">{{ uptime }}</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Active Users</span>
+            <span class="status-value">{{ stats.active_users_count }}</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Python Version</span>
+            <span class="status-value">{{ python_version }}</span>
+        </div>
+    </div>
+
+    <div class="status-card">
+        <h5><i class="fas fa-chart-line me-2 text-success"></i> Today's Activity</h5>
+        <div class="status-item">
+            <span class="status-label">Batches Created</span>
+            <span class="status-value">{{ today_batches_count }}</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Last Batch</span>
+            <span class="status-value">
+                {% if last_batch %}
+                {{ last_batch.created_at|date:"H:i" }}
+                {% else %}
+                None
+                {% endif %}
+            </span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Current Date</span>
+            <span class="status-value">{{ current_date|date:"d M Y" }}</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">System Mode</span>
+            <span class="status-value">
+                {% if debug %}
+                <span class="badge bg-warning">Debug</span>
+                {% else %}
+                <span class="badge bg-success">Production</span>
+                {% endif %}
+            </span>
+        </div>
+    </div>
+
+    <div class="status-card">
+        <h5><i class="fas fa-tasks me-2 text-info"></i> Quick Actions</h5>
+        <div class="d-grid gap-2">
+            <a href="{% url 'user_create' %}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-user-plus me-2"></i> Add New User
+            </a>
+            <a href="{% url 'bank_add' %}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-university me-2"></i> Add New Bank
+            </a>
+            <a href="{% url 'supplier_add' %}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-truck me-2"></i> Add Supplier
+            </a>
+            <a href="/admin/" target="_blank" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-cog me-2"></i> Django Admin
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Update current date
+    function updateCurrentDate() {
+        const now = new Date();
+        const options = { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        };
+        $('#current-date').text(now.toLocaleDateString('en-GB', options));
+    }
+    updateCurrentDate();
+});
+</script>
+{% endblock %}

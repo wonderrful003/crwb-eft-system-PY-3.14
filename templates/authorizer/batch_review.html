@@ -1,0 +1,273 @@
+<!-- authorizer/review_batch.html -->
+{% extends 'base.html' %}
+
+{% block title %}Review Batch - {{ batch.batch_reference }} - CRWB EFT{% endblock %}
+
+{% block page_title %}
+    <i class="fas fa-clipboard-check text-warning"></i> Review EFT Batch for Approval
+{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'authorizer_dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item active">Review Batch</li>
+{% endblock %}
+
+{% block sidebar_menu %}
+<li>
+    <a href="{% url 'authorizer_dashboard' %}">
+        <i class="fas fa-tachometer-alt"></i>
+        <span>Dashboard</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'authorizer_batch_list' %}">
+        <i class="fas fa-list"></i>
+        <span>All Batches</span>
+    </a>
+</li>
+{% endblock %}
+
+{% block content %}
+<!-- Action Alert -->
+<div class="alert alert-warning border-0 shadow-sm mb-4">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+        <div class="flex-grow-1">
+            <h6 class="mb-1"><strong>Batch Review Required</strong></h6>
+            <p class="mb-0">Please carefully review all transaction details before approving or rejecting this batch.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Summary & Actions -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="dashboard-card border-warning">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> Batch Summary
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <th width="150"><i class="fas fa-hashtag text-primary"></i> Reference:</th>
+                                <td><strong class="text-primary fs-6">{{ batch.batch_reference }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th><i class="fas fa-tag text-info"></i> Batch Name:</th>
+                                <td><strong>{{ batch.batch_name }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th><i class="fas fa-user text-secondary"></i> Created By:</th>
+                                <td>{{ batch.created_by.get_full_name|default:batch.created_by.username }}</td>
+                            </tr>
+                            <tr>
+                                <th><i class="fas fa-calendar text-info"></i> Created Date:</th>
+                                <td>{{ batch.created_at|date:"l, d F Y" }}<br><small class="text-muted">{{ batch.created_at|date:"H:i:s" }}</small></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <th width="150"><i class="fas fa-list-ol text-secondary"></i> Total Records:</th>
+                                <td><span class="badge bg-secondary fs-6">{{ batch.record_count }}</span></td>
+                            </tr>
+                            <tr>
+                                <th><i class="fas fa-money-bill-wave text-success"></i> Total Amount:</th>
+                                <td><strong class="text-success fs-4">MWK {{ total_amount|floatformat:2 }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th><i class="fas fa-coins text-warning"></i> Currency:</th>
+                                <td><strong>{{ batch.currency }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th><i class="fas fa-flag text-warning"></i> Status:</th>
+                                <td><span class="status-badge status-pending fs-6"><i class="fas fa-clock"></i> Pending</span></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Quick Summary Card -->
+        <div class="dashboard-card bg-light border-0">
+            <div class="card-body text-center p-4">
+                <i class="fas fa-file-invoice-dollar fa-3x text-primary mb-3"></i>
+                <h4 class="text-primary mb-2">{{ batch.record_count }}</h4>
+                <p class="text-muted mb-3">Transactions</p>
+                <hr>
+                <h3 class="text-success mb-2">MWK {{ total_amount|floatformat:2 }}</h3>
+                <p class="text-muted mb-0">Total Batch Amount</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transaction Details -->
+<div class="dashboard-card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+            <i class="fas fa-list-check"></i> Transaction Details
+            <span class="badge bg-white text-primary ms-2">{{ transactions.count }} records</span>
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered table-sm align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th width="50" class="text-center">Seq</th>
+                        <th>Debit Account</th>
+                        <th>Supplier Details</th>
+                        <th>Bank & Account</th>
+                        <th class="text-center">Scheme</th>
+                        <th class="text-center">Zone</th>
+                        <th class="text-end">Amount (MWK)</th>
+                        <th>Narration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for trans in transactions %}
+                    <tr>
+                        <td class="text-center"><strong class="text-muted">#{{ trans.sequence_number }}</strong></td>
+                        <td>
+                            <code>{{ trans.debit_account.account_number }}</code><br>
+                            <small class="text-muted">{{ trans.debit_account.account_name|truncatechars:20 }}</small>
+                        </td>
+                        <td>
+                            <strong>{{ trans.supplier.supplier_name }}</strong><br>
+                            <small class="text-muted">
+                                <i class="fas fa-barcode"></i> {{ trans.supplier.supplier_code }}
+                            </small>
+                        </td>
+                        <td>
+                            <strong>{{ trans.supplier.bank.bank_name }}</strong><br>
+                            <code class="text-primary">{{ trans.supplier.account_number }}</code><br>
+                            <small class="text-muted">SWIFT: {{ trans.supplier.bank.swift_code }}</small>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-info">{{ trans.scheme.scheme_code }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-secondary">{{ trans.zone.zone_code }}</span>
+                        </td>
+                        <td class="text-end">
+                            <strong class="text-success">{{ trans.amount|floatformat:2 }}</strong>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 200px;" title="{{ trans.narration }}">
+                                {{ trans.narration|default:"—" }}
+                            </div>
+                            {% if trans.reference_number %}
+                            <small class="text-muted d-block">Ref: {{ trans.reference_number }}</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-success">
+                    <tr>
+                        <th colspan="6" class="text-end">GRAND TOTAL:</th>
+                        <th class="text-end">MWK {{ total_amount|floatformat:2 }}</th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Approval/Rejection Actions -->
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="dashboard-card border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-check-circle"></i> Approve Batch
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-light border">
+                    <i class="fas fa-info-circle text-success"></i>
+                    <strong>Approval Checklist:</strong>
+                    <ul class="mb-0 mt-2 ps-3">
+                        <li>All amounts have been verified</li>
+                        <li>Bank account details are correct</li>
+                        <li>Scheme and zone mappings are accurate</li>
+                        <li>No suspicious or duplicate transactions</li>
+                    </ul>
+                </div>
+                
+                <form method="post" action="{% url 'approve_batch' batch.id %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="{{ approval_form.remarks.id_for_label }}" class="form-label">
+                            <i class="fas fa-comment"></i> Approval Remarks (Optional)
+                        </label>
+                        {{ approval_form.remarks }}
+                        <small class="form-text text-muted">Add any notes about this approval</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success w-100 btn-lg" 
+                            onclick="return confirm('Are you sure you want to APPROVE this batch?\n\nBatch: {{ batch.batch_reference }}\nAmount: MWK {{ total_amount|floatformat:2 }}\nRecords: {{ batch.record_count }}')">
+                        <i class="fas fa-check-circle"></i> Approve Batch
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="dashboard-card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-times-circle"></i> Reject Batch
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-light border">
+                    <i class="fas fa-exclamation-triangle text-danger"></i>
+                    <strong>Rejection Reasons:</strong>
+                    <ul class="mb-0 mt-2 ps-3">
+                        <li>Incorrect amounts or calculations</li>
+                        <li>Wrong bank account details</li>
+                        <li>Missing or incomplete information</li>
+                        <li>Policy violations or irregularities</li>
+                    </ul>
+                </div>
+                
+                <form method="post" action="{% url 'reject_batch' batch.id %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="{{ rejection_form.rejection_reason.id_for_label }}" class="form-label">
+                            <i class="fas fa-exclamation-circle"></i> Rejection Reason 
+                            <span class="text-danger">*</span>
+                        </label>
+                        {{ rejection_form.rejection_reason }}
+                        <small class="form-text text-muted">Clearly explain why this batch is being rejected</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-danger w-100 btn-lg"
+                            onclick="return confirm('Are you sure you want to REJECT this batch?\n\nThis action will return the batch to the creator for corrections.')">
+                        <i class="fas fa-ban"></i> Reject Batch
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Back Button -->
+<div class="text-center mt-4">
+    <a href="{% url 'authorizer_dashboard' %}" class="btn btn-outline-secondary btn-lg">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+{% endblock %}

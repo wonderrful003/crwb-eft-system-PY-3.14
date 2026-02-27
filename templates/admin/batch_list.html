@@ -1,0 +1,578 @@
+{% extends 'base.html' %}
+
+{% block title %}My EFT Batches{% endblock %}
+
+{% block page_title %}My EFT Batches{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'accounts_dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item active">Batches</li>
+{% endblock %}
+
+{% block top_actions %}
+<a href="{% url 'create_batch' %}" class="btn btn-primary btn-action">
+    <i class="fas fa-plus-circle"></i> New Batch
+</a>
+<div class="btn-group">
+    <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="fas fa-download"></i> Export
+    </button>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="#" id="exportSelectedCSV">Export Selected (CSV)</a></li>
+        <li><a class="dropdown-item" href="#" id="exportSelectedExcel">Export Selected (Excel)</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{% url 'batch_export_all' %}?format=csv">Export All (CSV)</a></li>
+        <li><a class="dropdown-item" href="{% url 'batch_export_all' %}?format=excel">Export All (Excel)</a></li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Filter Tabs and Search -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link {% if not status_filter %}active{% endif %}" href="{% url 'batch_list' %}">
+                            All
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if status_filter == 'DRAFT' %}active{% endif %}" href="?status=DRAFT">
+                            Draft ({{ draft_count|default:0 }})
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if status_filter == 'PENDING' %}active{% endif %}" href="?status=PENDING">
+                            Pending ({{ pending_count|default:0 }})
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if status_filter == 'APPROVED' %}active{% endif %}" href="?status=APPROVED">
+                            Approved ({{ approved_count|default:0 }})
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if status_filter == 'REJECTED' %}active{% endif %}" href="?status=REJECTED">
+                            Rejected ({{ rejected_count|default:0 }})
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <form method="get" class="d-flex">
+                    <input type="text" name="search" class="form-control" placeholder="Search batches..." 
+                           value="{{ request.GET.search }}">
+                    <button type="submit" class="btn btn-primary ms-2">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    {% if request.GET.search %}
+                    <a href="{% url 'batch_list' %}{% if status_filter %}?status={{ status_filter }}{% endif %}" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-times"></i>
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        
+        <!-- Quick Stats -->
+        <div class="row mt-3 g-2">
+            <div class="col-6 col-md-3">
+                <div class="alert alert-light border text-center py-2 mb-0">
+                    <small class="text-muted d-block">Total Batches</small>
+                    <strong class="h5">{{ total_batches|default:0 }}</strong>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="alert alert-light border text-center py-2 mb-0">
+                    <small class="text-muted d-block">Total Amount</small>
+                    <strong class="h5">MWK {{ total_amount|default:0|floatformat:2 }}</strong>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="alert alert-light border text-center py-2 mb-0">
+                    <small class="text-muted d-block">Total Records</small>
+                    <strong class="h5">{{ total_records|default:0 }}</strong>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="alert alert-light border text-center py-2 mb-0">
+                    <small class="text-muted d-block">Avg. Batch Size</small>
+                    <strong class="h5">{{ avg_batch_size|default:0|floatformat:0 }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Batches Table -->
+<div class="dashboard-card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-file-invoice-dollar text-primary"></i> My Batches
+            </h5>
+            <div class="text-muted">
+                Showing {{ batches|length }} of {{ total_count|default:0 }} batches
+            </div>
+        </div>
+    </div>
+    
+    <div class="card-body">
+        {% if batches %}
+        <!-- Bulk Actions -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="selectAll">
+                <label class="form-check-label" for="selectAll">Select All</label>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-outline-danger" id="bulkDelete" 
+                        {% if not can_delete_any %}disabled{% endif %}>
+                    Delete Selected
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" id="exportSelected">
+                    Export Selected
+                </button>
+            </div>
+        </div>
+        
+        <!-- Desktop Table -->
+        <div class="d-none d-md-block">
+            <div class="table-responsive">
+                <table class="table table-hover data-table">
+                    <thead>
+                        <tr>
+                            <th width="50">
+                                <input type="checkbox" class="form-check-input" id="tableSelectAll">
+                            </th>
+                            <th>Batch Reference</th>
+                            <th>Batch Name</th>
+                            <th>Records</th>
+                            <th>Amount (MWK)</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Last Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for batch in batches %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input batch-checkbox" 
+                                       value="{{ batch.id }}" 
+                                       {% if batch.status != 'DRAFT' %}disabled{% endif %}>
+                            </td>
+                            <td><strong>{{ batch.batch_reference }}</strong></td>
+                            <td>{{ batch.batch_name }}</td>
+                            <td>{{ batch.record_count }}</td>
+                            <td>{{ batch.total_amount|floatformat:2 }}</td>
+                            <td>
+                                {% if batch.status == 'DRAFT' %}
+                                <span class="badge bg-secondary">Draft</span>
+                                {% elif batch.status == 'PENDING' %}
+                                <span class="badge bg-warning">Pending</span>
+                                {% elif batch.status == 'APPROVED' %}
+                                <span class="badge bg-success">Approved</span>
+                                {% elif batch.status == 'REJECTED' %}
+                                <span class="badge bg-danger">Rejected</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ batch.created_at|date:"d M Y" }}</td>
+                            <td>{{ batch.updated_at|timesince }} ago</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    {% if batch.status == 'DRAFT' %}
+                                    <a href="{% url 'edit_batch' batch.id %}" class="btn btn-sm btn-primary" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'delete_batch' batch.id %}" class="btn btn-sm btn-danger" title="Delete"
+                                       onclick="return confirm('Delete this batch?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                    <a href="{% url 'submit_batch' batch.id %}" class="btn btn-sm btn-success" title="Submit"
+                                       onclick="return confirm('Submit for approval?')">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </a>
+                                    {% else %}
+                                    <a href="{% url 'view_batch' batch.id %}" class="btn btn-sm btn-info" title="View">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% endif %}
+                                    
+                                    {% if batch.status == 'APPROVED' %}
+                                    <div class="dropdown d-inline-block">
+                                        <button class="btn btn-sm btn-success dropdown-toggle" type="button" 
+                                                data-bs-toggle="dropdown">
+                                            <i class="fas fa-download"></i>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            <li><a class="dropdown-item" href="{% url 'export_batch' batch.id 'txt' %}">TXT File</a></li>
+                                            <li><a class="dropdown-item" href="{% url 'export_batch' batch.id 'csv' %}">CSV File</a></li>
+                                            <li><a class="dropdown-item" href="{% url 'export_batch_details' batch.id %}">Details (PDF)</a></li>
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Mobile Cards -->
+        <div class="d-md-none">
+            <div class="row">
+                {% for batch in batches %}
+                <div class="col-12 mb-3">
+                    <div class="card border h-100 batch-card">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-{% if batch.status == 'DRAFT' %}secondary{% elif batch.status == 'PENDING' %}warning{% elif batch.status == 'APPROVED' %}success{% else %}danger{% endif %} me-2">
+                                    {{ batch.status }}
+                                </span>
+                                <strong>{{ batch.batch_reference }}</strong>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" 
+                                       value="{{ batch.id }}"
+                                       {% if batch.status != 'DRAFT' %}disabled{% endif %}>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="card-title">{{ batch.batch_name }}</h6>
+                            
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Records:</small>
+                                    <strong>{{ batch.record_count }}</strong>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Amount:</small>
+                                    <strong>MWK {{ batch.total_amount|floatformat:2 }}</strong>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Created:</small>
+                                    <small>{{ batch.created_at|date:"d M Y" }}</small>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Updated:</small>
+                                    <small>{{ batch.updated_at|timesince }} ago</small>
+                                </div>
+                            </div>
+                            
+                            <div class="btn-group w-100" role="group">
+                                {% if batch.status == 'DRAFT' %}
+                                <a href="{% url 'edit_batch' batch.id %}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <a href="{% url 'delete_batch' batch.id %}" class="btn btn-sm btn-danger"
+                                   onclick="return confirm('Delete this batch?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                                <a href="{% url 'submit_batch' batch.id %}" class="btn btn-sm btn-success"
+                                   onclick="return confirm('Submit for approval?')">
+                                    <i class="fas fa-paper-plane"></i>
+                                </a>
+                                {% else %}
+                                <a href="{% url 'view_batch' batch.id %}" class="btn btn-sm btn-info">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                                {% endif %}
+                                
+                                {% if batch.status == 'APPROVED' %}
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-success dropdown-toggle" type="button" 
+                                            data-bs-toggle="dropdown">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="{% url 'export_batch' batch.id 'txt' %}">TXT</a></li>
+                                        <li><a class="dropdown-item" href="{% url 'export_batch' batch.id 'csv' %}">CSV</a></li>
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Previous</a>
+                </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Last</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-5">
+            <div class="mb-4">
+                <i class="fas fa-file-invoice-dollar fa-4x text-muted"></i>
+            </div>
+            <h4 class="text-muted mb-3">No Batches Found</h4>
+            <p class="text-muted mb-4">
+                {% if status_filter %}
+                    No {{ status_filter|lower }} batches found.
+                {% else %}
+                    You haven't created any EFT batches yet.
+                {% endif %}
+            </p>
+            <a href="{% url 'create_batch' %}" class="btn btn-primary btn-lg">
+                <i class="fas fa-plus-circle"></i> Create Your First Batch
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.batch-card {
+    transition: transform 0.2s;
+    border-left: 4px solid #0d6efd !important;
+}
+
+.batch-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-draft { background-color: #6c757d; color: white; }
+.status-pending { background-color: #ffc107; color: black; }
+.status-approved { background-color: #198754; color: white; }
+.status-rejected { background-color: #dc3545; color: white; }
+
+@media (max-width: 768px) {
+    .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .nav-tabs .nav-item {
+        display: inline-block;
+        float: none;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Bulk selection
+    const tableSelectAll = document.getElementById('tableSelectAll');
+    const selectAll = document.getElementById('selectAll');
+    const batchCheckboxes = document.querySelectorAll('.batch-checkbox:not(:disabled)');
+    
+    function updateSelectAllCheckbox() {
+        const enabledCheckboxes = Array.from(document.querySelectorAll('.batch-checkbox:not(:disabled)'));
+        const allChecked = enabledCheckboxes.length > 0 && 
+                          enabledCheckboxes.every(cb => cb.checked);
+        const anyChecked = enabledCheckboxes.some(cb => cb.checked);
+        
+        if (tableSelectAll) {
+            tableSelectAll.checked = allChecked;
+            tableSelectAll.indeterminate = anyChecked && !allChecked;
+        }
+        if (selectAll) {
+            selectAll.checked = allChecked;
+            selectAll.indeterminate = anyChecked && !allChecked;
+        }
+    }
+    
+    if (tableSelectAll) {
+        tableSelectAll.addEventListener('change', function(e) {
+            batchCheckboxes.forEach(cb => cb.checked = e.target.checked);
+            updateSelectAllCheckbox();
+        });
+    }
+    
+    if (selectAll) {
+        selectAll.addEventListener('change', function(e) {
+            batchCheckboxes.forEach(cb => cb.checked = e.target.checked);
+            updateSelectAllCheckbox();
+        });
+    }
+    
+    batchCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelectAllCheckbox);
+    });
+    
+    // Bulk actions
+    const bulkDelete = document.getElementById('bulkDelete');
+    const exportSelected = document.getElementById('exportSelected');
+    const exportSelectedCSV = document.getElementById('exportSelectedCSV');
+    const exportSelectedExcel = document.getElementById('exportSelectedExcel');
+    
+    function getSelectedBatchIds() {
+        return Array.from(document.querySelectorAll('.batch-checkbox:checked:not(:disabled)'))
+            .map(cb => cb.value);
+    }
+    
+    // Bulk delete
+    if (bulkDelete) {
+        bulkDelete.addEventListener('click', function() {
+            const selectedIds = getSelectedBatchIds();
+            
+            if (selectedIds.length === 0) {
+                alert('Please select at least one draft batch to delete');
+                return;
+            }
+            
+            if (!confirm(`Delete ${selectedIds.length} selected draft batch(es)?`)) {
+                return;
+            }
+            
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{% url "batch_bulk_delete" %}';
+            
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrfToken) {
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrfmiddlewaretoken';
+                csrfInput.value = csrfToken.value;
+                form.appendChild(csrfInput);
+            }
+            
+            selectedIds.forEach(id => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'batch_ids';
+                input.value = id;
+                form.appendChild(input);
+            });
+            
+            document.body.appendChild(form);
+            form.submit();
+        });
+    }
+    
+    // Export selected
+    if (exportSelected) {
+        exportSelected.addEventListener('click', function() {
+            const selectedIds = getSelectedBatchIds();
+            
+            if (selectedIds.length === 0) {
+                alert('Please select at least one batch to export');
+                return;
+            }
+            
+            // Create export URL with selected IDs
+            const params = new URLSearchParams();
+            selectedIds.forEach(id => params.append('batch_ids', id));
+            params.append('format', 'csv');
+            
+            window.location.href = `{% url 'batch_export_selected' %}?${params.toString()}`;
+        });
+    }
+    
+    // Export selected CSV
+    if (exportSelectedCSV) {
+        exportSelectedCSV.addEventListener('click', function(e) {
+            e.preventDefault();
+            const selectedIds = getSelectedBatchIds();
+            
+            if (selectedIds.length === 0) {
+                alert('Please select at least one batch to export');
+                return;
+            }
+            
+            const params = new URLSearchParams();
+            selectedIds.forEach(id => params.append('batch_ids', id));
+            params.append('format', 'csv');
+            
+            window.location.href = `{% url 'batch_export_selected' %}?${params.toString()}`;
+        });
+    }
+    
+    // Export selected Excel
+    if (exportSelectedExcel) {
+        exportSelectedExcel.addEventListener('click', function(e) {
+            e.preventDefault();
+            const selectedIds = getSelectedBatchIds();
+            
+            if (selectedIds.length === 0) {
+                alert('Please select at least one batch to export');
+                return;
+            }
+            
+            const params = new URLSearchParams();
+            selectedIds.forEach(id => params.append('batch_ids', id));
+            params.append('format', 'excel');
+            
+            window.location.href = `{% url 'batch_export_selected' %}?${params.toString()}`;
+        });
+    }
+    
+    // Auto-submit search on tab change
+    document.querySelectorAll('.nav-tabs .nav-link').forEach(tab => {
+        tab.addEventListener('click', function(e) {
+            if (this.getAttribute('href').startsWith('?')) {
+                e.preventDefault();
+                const status = new URLSearchParams(this.getAttribute('href')).get('status');
+                const search = document.querySelector('input[name="search"]').value;
+                
+                let url = '{% url "batch_list" %}';
+                const params = new URLSearchParams();
+                if (status) params.append('status', status);
+                if (search) params.append('search', search);
+                
+                window.location.href = url + '?' + params.toString();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

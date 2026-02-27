@@ -1,0 +1,173 @@
+<!-- accounts/create_batch.html -->
+{% extends 'base.html' %}
+
+{% block title %}Create EFT Batch - CRWB EFT{% endblock %}
+
+{% block page_title %}Create New EFT Batch{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'accounts_dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item active">Create Batch</li>
+{% endblock %}
+
+{% block sidebar_menu %}
+<li>
+    <a href="{% url 'accounts_dashboard' %}">
+        <i class="fas fa-tachometer-alt"></i>
+        <span>Dashboard</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'create_batch' %}" class="active">
+        <i class="fas fa-plus-circle"></i>
+        <span>Create Batch</span>
+    </a>
+</li>
+<li>
+    <a href="{% url 'batch_list' %}">
+        <i class="fas fa-list"></i>
+        <span>My Batches</span>
+    </a>
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-6">
+        <!-- Instructions Card -->
+        <div class="dashboard-card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle"></i> Getting Started
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4 text-center">
+                        <div class="mb-2">
+                            <i class="fas fa-file-alt fa-2x text-info"></i>
+                        </div>
+                        <strong>Step 1</strong>
+                        <p class="small mb-0">Create batch with a descriptive name</p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="mb-2">
+                            <i class="fas fa-plus-circle fa-2x text-warning"></i>
+                        </div>
+                        <strong>Step 2</strong>
+                        <p class="small mb-0">Add transactions to the batch</p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="mb-2">
+                            <i class="fas fa-paper-plane fa-2x text-success"></i>
+                        </div>
+                        <strong>Step 3</strong>
+                        <p class="small mb-0">Submit for approval</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Batch Form -->
+        <div class="dashboard-card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-file-invoice"></i> New EFT Batch Details
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.batch_name.id_for_label }}" class="form-label">
+                            <i class="fas fa-tag text-primary"></i> Batch Name 
+                            <span class="text-danger">*</span>
+                        </label>
+                        {{ form.batch_name }}
+                        <div class="form-text">
+                            <i class="fas fa-lightbulb text-warning"></i>
+                            <strong>Examples:</strong> "January 2025 Salaries", "Q1 Supplier Payments", "Project X Disbursements"
+                        </div>
+                        {% if form.batch_name.errors %}
+                        <div class="text-danger mt-2">
+                            <i class="fas fa-exclamation-circle"></i>
+                            {{ form.batch_name.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="alert alert-light border">
+                        <div class="d-flex align-items-start">
+                            <i class="fas fa-info-circle text-info fa-2x me-3"></i>
+                            <div>
+                                <h6 class="alert-heading">What happens next?</h6>
+                                <ul class="mb-0 ps-3">
+                                    <li>After creating the batch, you'll be redirected to add transactions</li>
+                                    <li>You can add multiple transactions to the batch</li>
+                                    <li>Review all transactions before submitting for approval</li>
+                                    <li>Once submitted, the batch will await authorizer approval</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{% url 'accounts_dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="fas fa-check-circle"></i> Create Batch
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tips Card -->
+        <div class="dashboard-card mt-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-lightbulb text-warning"></i> Best Practices
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success"></i>
+                        Use clear, descriptive names that identify the purpose and period
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success"></i>
+                        Include the month/quarter/year in the batch name
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success"></i>
+                        Group related transactions in a single batch
+                    </li>
+                    <li class="mb-0">
+                        <i class="fas fa-check text-success"></i>
+                        Avoid creating duplicate batches for the same payments
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Auto-focus on batch name field
+    $('#{{ form.batch_name.id_for_label }}').focus();
+    
+    // Form validation feedback
+    $('form').on('submit', function() {
+        const submitBtn = $(this).find('button[type="submit"]');
+        submitBtn.prop('disabled', true);
+        submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Creating...');
+    });
+});
+</script>
+{% endblock %}
