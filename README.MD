@@ -1,4 +1,6 @@
+Here's the updated README with your database configuration:
 
+```markdown
 # 🏦 CRWB EFT Payment Processing System
 
 **Electronic Funds Transfer System for Central Region Water Board, Malawi**
@@ -149,13 +151,13 @@ tzdata==2024.1
 mysql -u root -p
 
 -- Create database (MUST match settings.py)
-CREATE DATABASE crwbeftdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Create database user (MUST match settings.py)
-CREATE USER 'crwbeftuser'@'localhost' IDENTIFIED BY 'CrwbEft@2025';
+CREATE USER 'root'@'localhost' IDENTIFIED BY 'your_password';
 
 -- Grant privileges
-GRANT ALL PRIVILEGES ON crwbeftdb.* TO 'crwbeftuser'@'localhost';
+GRANT ALL PRIVILEGES ON crwb_eft_system.* TO 'root'@'localhost';
 FLUSH PRIVILEGES;
 
 -- Verify
@@ -163,7 +165,7 @@ SHOW DATABASES;
 EXIT;
 ```
 
-**IMPORTANT**: Database name and user must exactly match your `settings.py` configuration.
+**IMPORTANT**: Database name must exactly match your `settings.py` configuration.
 
 ---
 
@@ -189,9 +191,9 @@ DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 
 # MySQL Configuration (MUST match your MySQL setup)
-DB_NAME=crwbeftdb
-DB_USER=crwbeftuser
-DB_PASSWORD=CrwbEft@2025
+DB_NAME=crwb_eft_system
+DB_USER=root
+DB_PASSWORD=your_password_here  # Change this
 DB_HOST=localhost
 DB_PORT=3306
 
@@ -211,15 +213,15 @@ Ensure `eft_system/settings.py` matches:
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'crwbeftdb',           # Must match DB_NAME in .env
-        'USER': 'crwbeftuser',         # Must match DB_USER in .env
-        'PASSWORD': 'CrwbEft@2025',    # Must match DB_PASSWORD in .env
+        'NAME': 'crwb_eft_system',        # Must match DB_NAME in .env
+        'USER': 'root',                    # Must match DB_USER in .env
+        'PASSWORD': '',                    # Change this - Must match DB_PASSWORD in .env
         'HOST': 'localhost',
         'PORT': '3306',
         'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             'charset': 'utf8mb4',
-        }
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
     }
 }
 ```
@@ -378,16 +380,16 @@ The system generates RBM-compliant EFT files with exact format:
 mysql --version
 
 # Test connection manually
-mysql -u crwbeftuser -p
+mysql -u root -p
 ```
 
 #### 2. Database Access Denied
-**Error**: `Access denied for user 'crwbeftuser'@'localhost'`
+**Error**: `Access denied for user 'root'@'localhost'`
 
 **Solution**:
 ```sql
 -- Grant privileges again
-GRANT ALL PRIVILEGES ON crwbeftdb.* TO 'crwbeftuser'@'localhost';
+GRANT ALL PRIVILEGES ON crwb_eft_system.* TO 'root'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
@@ -426,6 +428,7 @@ lsof -ti:8000 | xargs kill -9
 For development, ensure `DEBUG=True` in `.env` file to see detailed error messages.
 
 ---
+
 
 
 ### Documentation
