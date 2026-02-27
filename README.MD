@@ -244,7 +244,7 @@ python manage.py createsuperuser
 
 ### Step 3: Load Sample Data (Optional)
 ```bash
-python manage.py loaddata sample_data.json
+python manage.py loaddata eft_config_data.json
 ```
 
 ### Step 4: Start Development Server
