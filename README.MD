@@ -1,4 +1,3 @@
-Here's the updated README with your database configuration:
 
 ```markdown
 # 🏦 CRWB EFT Payment Processing System
