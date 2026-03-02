@@ -4,14 +4,16 @@
 {% block title %}View Batch - {{ batch.batch_reference }} - CRWB EFT{% endblock %}
 
 {% block page_title %}
-    {% if batch.status == 'APPROVED' %}
+    {% if batch.status == 'APPROVED' or batch.status == 'EXPORTED' %}
         <i class="fas fa-check-circle text-success"></i>
     {% elif batch.status == 'REJECTED' %}
         <i class="fas fa-times-circle text-danger"></i>
-    {% elif batch.status == 'PENDING' %}
-        <i class="fas fa-clock text-info"></i>
+    {% elif batch.status == 'PENDING_FM' %}
+        <i class="fas fa-user-tie text-warning"></i>
+    {% elif batch.status == 'PENDING_DIRECTOR' %}
+        <i class="fas fa-crown text-info"></i>
     {% else %}
-        <i class="fas fa-file-alt text-warning"></i>
+        <i class="fas fa-file-alt text-secondary"></i>
     {% endif %}
     EFT Batch Details
 {% endblock %}
@@ -44,7 +46,7 @@
         <i class="fas fa-edit"></i> Edit Batch
     </a>
     {% endif %}
-    {% if batch.status == 'APPROVED' %}
+    {% if batch.status == 'APPROVED' or batch.status == 'EXPORTED' %}
     <a href="{% url 'export_batch' batch.id 'txt' %}" class="btn btn-success">
         <i class="fas fa-download"></i> Download TXT
     </a>
@@ -58,65 +60,440 @@
 </div>
 {% endblock %}
 
-{% block content %}
-<!-- Batch Status Banner -->
-<div class="alert 
-    {% if batch.status == 'APPROVED' %}alert-success
-    {% elif batch.status == 'REJECTED' %}alert-danger
-    {% elif batch.status == 'PENDING' %}alert-info
-    {% else %}alert-warning{% endif %} 
-    border-0 shadow-sm mb-4">
-    <div class="row align-items-center">
-        <div class="col-auto">
-            <i class="fas fa-3x 
-                {% if batch.status == 'APPROVED' %}fa-check-circle
-                {% elif batch.status == 'REJECTED' %}fa-times-circle
-                {% elif batch.status == 'PENDING' %}fa-clock
-                {% else %}fa-edit{% endif %}">
-            </i>
-        </div>
-        <div class="col">
-            <h5 class="mb-1">
-                {% if batch.status == 'APPROVED' %}
-                    Batch Approved Successfully
-                {% elif batch.status == 'REJECTED' %}
-                    Batch Rejected
-                {% elif batch.status == 'PENDING' %}
-                    Batch Pending Approval
-                {% else %}
-                    Batch in Draft Status
-                {% endif %}
-            </h5>
-            <p class="mb-0">
-                {% if batch.status == 'APPROVED' %}
-                    This batch has been approved and is ready for processing. You can download the export files.
-                {% elif batch.status == 'REJECTED' %}
-                    This batch was rejected. Please check the rejection reason below.
-                {% elif batch.status == 'PENDING' %}
-                    This batch is awaiting authorization. You will be notified once it's reviewed.
-                {% else %}
-                    This batch is still in draft. You can continue editing it.
-                {% endif %}
-            </p>
-        </div>
-    </div>
-</div>
+{% block page_css %}
+<style>
+/* ============================================================
+   APPROVAL WORKFLOW TRACKER
+   ============================================================ */
+.workflow-tracker {
+    background: #fff;
+    border: 1px solid #e0e4ea;
+    border-radius: 14px;
+    padding: 1.75rem 2rem 1.5rem;
+    margin-bottom: 1.75rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.055);
+}
+.workflow-tracker-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: #9aa0ac;
+    margin-bottom: 1.5rem;
+}
 
-<!-- Batch Details -->
+/* ---- Step row ---- */
+.wf-track {
+    display: flex;
+    align-items: flex-start;
+    position: relative;
+}
+
+/* Each step */
+.wf-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+}
+
+/* Connector line sitting BETWEEN steps */
+.wf-connector {
+    flex: 1;
+    height: 3px;
+    margin-top: 19px; /* vertically centres with the 40px circles */
+    border-radius: 99px;
+    background: #e0e4ea;
+    transition: background 0.6s ease;
+    position: relative;
+    z-index: 0;
+}
+.wf-connector.done { background: #00b894; }
+.wf-connector.partial {
+    background: linear-gradient(90deg, #00b894 0%, #e0e4ea 100%);
+}
+
+/* Circle */
+.wf-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 700;
+    border: 3px solid #e0e4ea;
+    background: #f4f6f9;
+    color: #b0b8c4;
+    transition: all 0.4s ease;
+    flex-shrink: 0;
+}
+
+/* ---- STATE MODIFIERS ---- */
+/* done = green tick */
+.wf-step.wf-done .wf-circle {
+    border-color: #00b894;
+    background: #00b894;
+    color: #fff;
+    box-shadow: 0 0 0 4px rgba(0,184,148,.15);
+}
+
+/* active = blue pulsing */
+.wf-step.wf-active .wf-circle {
+    border-color: #0d6efd;
+    background: #0d6efd;
+    color: #fff;
+    box-shadow: 0 0 0 5px rgba(13,110,253,.15);
+    animation: wf-pulse 1.8s infinite;
+}
+
+/* rejected = red */
+.wf-step.wf-rejected .wf-circle {
+    border-color: #d63031;
+    background: #d63031;
+    color: #fff;
+    box-shadow: 0 0 0 4px rgba(214,48,49,.15);
+}
+
+/* waiting = grey (default) */
+.wf-step.wf-waiting .wf-circle {
+    border-color: #e0e4ea;
+    background: #f4f6f9;
+    color: #b0b8c4;
+}
+
+@keyframes wf-pulse {
+    0%   { box-shadow: 0 0 0 0   rgba(13,110,253,.45); }
+    60%  { box-shadow: 0 0 0 11px rgba(13,110,253,0);  }
+    100% { box-shadow: 0 0 0 0   rgba(13,110,253,0);   }
+}
+
+/* Labels */
+.wf-label {
+    margin-top: 0.65rem;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #b0b8c4;
+    line-height: 1.3;
+    max-width: 80px;
+}
+.wf-step.wf-done .wf-label     { color: #00b894; }
+.wf-step.wf-active .wf-label   { color: #0d6efd; }
+.wf-step.wf-rejected .wf-label { color: #d63031; }
+.wf-sublabel {
+    font-size: 0.67rem;
+    font-weight: 400;
+    margin-top: 2px;
+    opacity: 0.85;
+}
+
+/* ---- REMARKS BELOW TRACKER ---- */
+.wf-remarks {
+    margin-top: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+.wf-remark-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    background: #f8f9fb;
+    border-radius: 8px;
+    padding: 0.7rem 1rem;
+    border-left: 4px solid #e0e4ea;
+    font-size: 0.875rem;
+}
+.wf-remark-item.remark-fm       { border-left-color: #0984e3; }
+.wf-remark-item.remark-director { border-left-color: #00b894; }
+.wf-remark-item.remark-rejected { border-left-color: #d63031; }
+.wf-remark-icon {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: #fff;
+}
+.icon-fm       { background: #0984e3; }
+.icon-director { background: #00b894; }
+.icon-rejected { background: #d63031; }
+.wf-remark-body strong { display: block; font-size: 0.8rem; color: #495057; margin-bottom: 1px; }
+.wf-remark-body span   { color: #6c757d; }
+.wf-remark-by { font-size: 0.7rem; color: #9aa0ac; margin-top: 2px; display: block; }
+
+/* ---- INLINE STATUS BADGE ---- */
+.status-badge {
+    padding: 0.35rem 0.85rem;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+.status-draft            { background: #f1f3f5;  color: #495057; border: 1px solid #dee2e6; }
+.status-pending_fm       { background: linear-gradient(135deg,#ffeaa7,#fdcb6e); color: #8b6914; }
+.status-pending_director { background: linear-gradient(135deg,#74b9ff,#0984e3); color: #fff;    }
+.status-approved         { background: linear-gradient(135deg,#55efc4,#00b894); color: #00563f; }
+.status-rejected         { background: linear-gradient(135deg,#ff7675,#d63031); color: #fff;    }
+.status-exported         { background: linear-gradient(135deg,#a29bfe,#6c5ce7); color: #fff;    }
+
+/* ---- AUDIT TRAIL ---- */
+.timeline-item {
+    display: flex;
+    gap: 1rem;
+    padding-bottom: 1.1rem;
+    margin-bottom: 0.1rem;
+    border-bottom: 1px solid #f1f3f5;
+    position: relative;
+}
+.timeline-item:last-child { border-bottom: none; padding-bottom: 0; }
+.timeline-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    color: white;
+}
+.tl-created   { background: #74b9ff; }
+.tl-submitted { background: #a29bfe; }
+.tl-fm        { background: #0984e3; }
+.tl-fmreject  { background: #d63031; }
+.tl-approved  { background: #00b894; }
+.tl-rejected  { background: #d63031; }
+.tl-exported  { background: #6c5ce7; }
+</style>
+{% endblock %}
+
+
+{% block content %}
+
+<!-- ================================================================
+     ANIMATED WORKFLOW TRACKER
+     ================================================================ -->
+<div class="workflow-tracker">
+    <div class="workflow-tracker-title">
+        <i class="fas fa-route me-1"></i> Approval Progress
+    </div>
+
+    <div class="wf-track">
+
+        <!-- 1. CREATED -->
+        <div class="wf-step wf-done">
+            <div class="wf-circle"><i class="fas fa-file-alt"></i></div>
+            <div class="wf-label">Created
+                <div class="wf-sublabel">{{ batch.created_at|date:"d M Y" }}</div>
+            </div>
+        </div>
+
+        <!-- connector 1→2 -->
+        <div class="wf-connector {% if batch.status != 'DRAFT' %}done{% endif %}"></div>
+
+        <!-- 2. SUBMITTED -->
+        <div class="wf-step
+            {% if batch.status == 'DRAFT' %}wf-waiting
+            {% else %}wf-done{% endif %}">
+            <div class="wf-circle">
+                {% if batch.status == 'DRAFT' %}<i class="fas fa-paper-plane"></i>
+                {% else %}<i class="fas fa-check"></i>{% endif %}
+            </div>
+            <div class="wf-label">Submitted
+                {% if batch.status != 'DRAFT' %}
+                <div class="wf-sublabel">
+                    {% for log in audit_logs %}{% if log.action == 'SUBMITTED' %}{{ log.timestamp|date:"d M Y" }}{% endif %}{% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- connector 2→3 -->
+        <div class="wf-connector
+            {% if batch.status == 'DRAFT' %}{% elif batch.status == 'PENDING_FM' %}partial
+            {% else %}done{% endif %}"></div>
+
+        <!-- 3. FINANCE MANAGER -->
+        <div class="wf-step
+            {% if batch.status == 'DRAFT' %}wf-waiting
+            {% elif batch.status == 'PENDING_FM' %}wf-active
+            {% elif batch.status == 'REJECTED' and not batch.approved_by and batch.fm_reviewed_by %}wf-rejected
+            {% elif batch.status == 'REJECTED' and not batch.fm_reviewed_by %}wf-rejected
+            {% else %}wf-done{% endif %}">
+            <div class="wf-circle">
+                {% if batch.status == 'DRAFT' %}<span>1</span>
+                {% elif batch.status == 'PENDING_FM' %}<i class="fas fa-user-tie"></i>
+                {% elif batch.status == 'REJECTED' and not batch.approved_by %}<i class="fas fa-times"></i>
+                {% else %}<i class="fas fa-check"></i>{% endif %}
+            </div>
+            <div class="wf-label">
+                {% if batch.status == 'PENDING_FM' %}Reviewing…
+                {% elif batch.status == 'REJECTED' and not batch.approved_by %}FM Rejected
+                {% else %}Finance Manager{% endif %}
+                {% if batch.fm_reviewed_at %}
+                <div class="wf-sublabel">{{ batch.fm_reviewed_at|date:"d M Y" }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- connector 3→4 -->
+        <div class="wf-connector
+            {% if batch.status in 'DRAFT,PENDING_FM' %}
+            {% elif batch.status == 'PENDING_DIRECTOR' %}partial
+            {% elif batch.status == 'REJECTED' and not batch.approved_by %}
+            {% else %}done{% endif %}"></div>
+
+        <!-- 4. DIRECTOR OF FINANCE -->
+        <div class="wf-step
+            {% if batch.status == 'DRAFT' or batch.status == 'PENDING_FM' or batch.status == 'REJECTED' and not batch.approved_by %}wf-waiting
+            {% elif batch.status == 'PENDING_DIRECTOR' %}wf-active
+            {% elif batch.status == 'REJECTED' and batch.approved_by %}wf-rejected
+            {% else %}wf-done{% endif %}">
+            <div class="wf-circle">
+                {% if batch.status == 'PENDING_DIRECTOR' %}<i class="fas fa-crown"></i>
+                {% elif batch.status == 'REJECTED' and batch.approved_by %}<i class="fas fa-times"></i>
+                {% elif batch.status == 'APPROVED' or batch.status == 'EXPORTED' %}<i class="fas fa-check"></i>
+                {% else %}<span>2</span>{% endif %}
+            </div>
+            <div class="wf-label">
+                {% if batch.status == 'PENDING_DIRECTOR' %}Reviewing…
+                {% elif batch.status == 'REJECTED' and batch.approved_by %}Dir. Rejected
+                {% else %}Director{% endif %}
+                {% if batch.approved_at and batch.status != 'REJECTED' %}
+                <div class="wf-sublabel">{{ batch.approved_at|date:"d M Y" }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- connector 4→5 -->
+        <div class="wf-connector
+            {% if batch.status == 'APPROVED' or batch.status == 'EXPORTED' %}done{% endif %}"></div>
+
+        <!-- 5. APPROVED / EXPORTED / REJECTED -->
+        <div class="wf-step
+            {% if batch.status == 'APPROVED' %}wf-done
+            {% elif batch.status == 'EXPORTED' %}wf-done
+            {% elif batch.status == 'REJECTED' %}wf-rejected
+            {% else %}wf-waiting{% endif %}">
+            <div class="wf-circle">
+                {% if batch.status == 'REJECTED' %}<i class="fas fa-times"></i>
+                {% elif batch.status == 'EXPORTED' %}<i class="fas fa-file-export"></i>
+                {% elif batch.status == 'APPROVED' %}<i class="fas fa-check"></i>
+                {% else %}<i class="fas fa-flag-checkered"></i>{% endif %}
+            </div>
+            <div class="wf-label">
+                {% if batch.status == 'REJECTED' %}Rejected
+                {% elif batch.status == 'EXPORTED' %}Exported
+                {% elif batch.status == 'APPROVED' %}Approved
+                {% else %}Complete{% endif %}
+                {% if batch.approved_at and batch.status == 'APPROVED' %}
+                <div class="wf-sublabel">{{ batch.approved_at|date:"d M Y" }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div><!-- /wf-track -->
+
+    <!-- ---- REMARKS UNDER THE TRACKER ---- -->
+    <div class="wf-remarks">
+
+        {# Rejection reason — shown whenever the batch is rejected #}
+        {% if batch.status == 'REJECTED' and batch.rejection_reason %}
+        <div class="wf-remark-item remark-rejected">
+            <div class="wf-remark-icon icon-rejected"><i class="fas fa-ban"></i></div>
+            <div class="wf-remark-body">
+                <strong>Rejection Reason</strong>
+                <span>{{ batch.rejection_reason }}</span>
+                <span class="wf-remark-by">
+                    {% if batch.approved_by %}
+                        — {{ batch.approved_by.get_full_name|default:batch.approved_by.username }}
+                        {% if batch.approved_at %}· {{ batch.approved_at|date:"d M Y H:i" }}{% endif %}
+                    {% elif batch.fm_reviewed_by %}
+                        — {{ batch.fm_reviewed_by.get_full_name|default:batch.fm_reviewed_by.username }}
+                        {% if batch.fm_reviewed_at %}· {{ batch.fm_reviewed_at|date:"d M Y H:i" }}{% endif %}
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        {% endif %}
+
+        {# FM remarks — shown whenever the FM has reviewed (forwarded or after) #}
+        {% if batch.fm_remarks %}
+        <div class="wf-remark-item remark-fm">
+            <div class="wf-remark-icon icon-fm"><i class="fas fa-user-tie"></i></div>
+            <div class="wf-remark-body">
+                <strong>Finance Manager's Remarks</strong>
+                <span>{{ batch.fm_remarks }}</span>
+                {% if batch.fm_reviewed_by %}
+                <span class="wf-remark-by">
+                    — {{ batch.fm_reviewed_by.get_full_name|default:batch.fm_reviewed_by.username }}
+                    {% if batch.fm_reviewed_at %}· {{ batch.fm_reviewed_at|date:"d M Y H:i" }}{% endif %}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Director remarks — shown when approved/rejected by director #}
+        {% if batch.approved_by and batch.remarks %}
+        <div class="wf-remark-item remark-director">
+            <div class="wf-remark-icon icon-director"><i class="fas fa-crown"></i></div>
+            <div class="wf-remark-body">
+                <strong>Director's Remarks</strong>
+                <span>{{ batch.remarks }}</span>
+                <span class="wf-remark-by">
+                    — {{ batch.approved_by.get_full_name|default:batch.approved_by.username }}
+                    {% if batch.approved_at %}· {{ batch.approved_at|date:"d M Y H:i" }}{% endif %}
+                </span>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Status message when no remarks — contextual hint #}
+        {% if not batch.rejection_reason and not batch.fm_remarks and not batch.remarks %}
+        <div class="wf-remark-item" style="border-left-color:#dee2e6; background:#fdfdfe;">
+            <div class="wf-remark-icon" style="background:#dee2e6; color:#9aa0ac;"><i class="fas fa-info"></i></div>
+            <div class="wf-remark-body">
+                <strong style="color:#9aa0ac;">
+                    {% if batch.status == 'DRAFT' %}Not yet submitted
+                    {% elif batch.status == 'PENDING_FM' %}Awaiting Finance Manager review — no remarks yet
+                    {% elif batch.status == 'PENDING_DIRECTOR' %}Finance Manager has forwarded this batch — awaiting Director approval
+                    {% elif batch.status == 'APPROVED' %}Final approval granted
+                    {% elif batch.status == 'EXPORTED' %}Exported to RBM
+                    {% endif %}
+                </strong>
+            </div>
+        </div>
+        {% endif %}
+
+    </div><!-- /wf-remarks -->
+
+</div><!-- /workflow-tracker -->
+
+
+<!-- ================================================================
+     BATCH DETAILS
+     ================================================================ -->
 <div class="row g-3 mb-4">
     <div class="col-lg-8">
         <div class="dashboard-card">
-            <div class="card-header 
-                {% if batch.status == 'APPROVED' %}bg-success text-white
+            <div class="card-header
+                {% if batch.status == 'APPROVED' or batch.status == 'EXPORTED' %}bg-success text-white
                 {% elif batch.status == 'REJECTED' %}bg-danger text-white
-                {% elif batch.status == 'PENDING' %}bg-info text-white
-                {% else %}bg-warning{% endif %}">
-                <h5 class="mb-0">
-                    <i class="fas fa-info-circle"></i> Batch Information
-                </h5>
+                {% elif batch.status == 'PENDING_FM' %}bg-warning
+                {% elif batch.status == 'PENDING_DIRECTOR' %}bg-info text-white
+                {% else %}bg-light{% endif %}">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Batch Information</h5>
             </div>
-            <div class="card-body">
-                <table class="table table-borderless">
+            <div class="card-body p-3">
+                <table class="table table-borderless mb-0">
                     <tbody>
                         <tr>
                             <th width="200"><i class="fas fa-hashtag text-primary"></i> Batch Reference:</th>
@@ -129,23 +506,15 @@
                         <tr>
                             <th><i class="fas fa-flag text-warning"></i> Status:</th>
                             <td>
-                                {% if batch.status == 'DRAFT' %}
-                                <span class="status-badge status-draft fs-6">
-                                    <i class="fas fa-edit"></i> Draft
+                                <span class="status-badge status-{{ batch.status|lower }}">
+                                    {% if batch.status == 'DRAFT' %}<i class="fas fa-edit"></i> Draft
+                                    {% elif batch.status == 'PENDING_FM' %}<i class="fas fa-user-tie"></i> With Finance Manager
+                                    {% elif batch.status == 'PENDING_DIRECTOR' %}<i class="fas fa-crown"></i> With Director of Finance
+                                    {% elif batch.status == 'APPROVED' %}<i class="fas fa-check"></i> Approved
+                                    {% elif batch.status == 'REJECTED' %}<i class="fas fa-times"></i> Rejected
+                                    {% elif batch.status == 'EXPORTED' %}<i class="fas fa-file-export"></i> Exported
+                                    {% endif %}
                                 </span>
-                                {% elif batch.status == 'PENDING' %}
-                                <span class="status-badge status-pending fs-6">
-                                    <i class="fas fa-clock"></i> Pending Approval
-                                </span>
-                                {% elif batch.status == 'APPROVED' %}
-                                <span class="status-badge status-approved fs-6">
-                                    <i class="fas fa-check"></i> Approved
-                                </span>
-                                {% elif batch.status == 'REJECTED' %}
-                                <span class="status-badge status-rejected fs-6">
-                                    <i class="fas fa-times"></i> Rejected
-                                </span>
-                                {% endif %}
                             </td>
                         </tr>
                         <tr>
@@ -168,20 +537,26 @@
                             <th><i class="fas fa-calendar-alt text-info"></i> Created At:</th>
                             <td>{{ batch.created_at|date:"l, d F Y" }} at {{ batch.created_at|date:"H:i:s" }}</td>
                         </tr>
+                        {% if batch.fm_reviewed_by %}
+                        <tr class="table-primary">
+                            <th><i class="fas fa-user-tie text-primary"></i> FM Reviewed By:</th>
+                            <td>{{ batch.fm_reviewed_by.get_full_name|default:batch.fm_reviewed_by.username }}</td>
+                        </tr>
+                        <tr class="table-primary">
+                            <th><i class="fas fa-calendar-check text-primary"></i> FM Reviewed At:</th>
+                            <td>{{ batch.fm_reviewed_at|date:"l, d F Y" }} at {{ batch.fm_reviewed_at|date:"H:i:s" }}</td>
+                        </tr>
+                        {% endif %}
                         {% if batch.approved_by %}
                         <tr class="table-success">
-                            <th><i class="fas fa-user-check text-success"></i> Approved By:</th>
+                            <th><i class="fas fa-crown text-success"></i>
+                                {% if batch.status == 'REJECTED' %}Rejected By:{% else %}Approved By:{% endif %}
+                            </th>
                             <td>{{ batch.approved_by.get_full_name|default:batch.approved_by.username }}</td>
                         </tr>
                         <tr class="table-success">
-                            <th><i class="fas fa-calendar-check text-success"></i> Approved At:</th>
+                            <th><i class="fas fa-calendar-check text-success"></i> Decision At:</th>
                             <td>{{ batch.approved_at|date:"l, d F Y" }} at {{ batch.approved_at|date:"H:i:s" }}</td>
-                        </tr>
-                        {% endif %}
-                        {% if batch.rejection_reason %}
-                        <tr class="table-danger">
-                            <th><i class="fas fa-exclamation-circle text-danger"></i> Rejection Reason:</th>
-                            <td class="text-danger"><strong>{{ batch.rejection_reason }}</strong></td>
                         </tr>
                         {% endif %}
                     </tbody>
@@ -193,14 +568,10 @@
     <div class="col-lg-4">
         <div class="dashboard-card mb-3">
             <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-pie"></i> Batch Summary
-                </h5>
+                <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Batch Summary</h5>
             </div>
-            <div class="card-body text-center">
-                <div class="mb-3">
-                    <i class="fas fa-file-invoice-dollar fa-3x text-primary"></i>
-                </div>
+            <div class="card-body text-center p-3">
+                <i class="fas fa-file-invoice-dollar fa-3x text-primary mb-3"></i>
                 <h3 class="text-primary">{{ batch.record_count }}</h3>
                 <p class="text-muted mb-3">Total Transactions</p>
                 <hr>
@@ -209,26 +580,45 @@
             </div>
         </div>
 
-        {% if batch.status == 'APPROVED' %}
+        {% if batch.status == 'APPROVED' or batch.status == 'EXPORTED' %}
         <div class="dashboard-card bg-success text-white">
-            <div class="card-body text-center">
-                <i class="fas fa-download fa-2x mb-3"></i>
-                <h6>Download Options</h6>
+            <div class="card-body text-center p-3">
+                <i class="fas fa-download fa-2x mb-2"></i>
+                <h6>Download EFT File</h6>
                 <div class="d-grid gap-2 mt-3">
-                    <a href="{% url 'export_batch' batch.id 'txt' %}" class="btn btn-light">
+                    <a href="{% url 'export_batch' batch.id 'txt' %}" class="btn btn-light btn-sm">
                         <i class="fas fa-file-alt"></i> TXT Format
                     </a>
-                    <a href="{% url 'export_batch' batch.id 'csv' %}" class="btn btn-light">
+                    <a href="{% url 'export_batch' batch.id 'csv' %}" class="btn btn-light btn-sm">
                         <i class="fas fa-file-csv"></i> CSV Format
                     </a>
                 </div>
+            </div>
+        </div>
+        {% elif batch.status == 'PENDING_FM' %}
+        <div class="dashboard-card border-warning">
+            <div class="card-body text-center p-3">
+                <i class="fas fa-user-tie fa-2x text-warning mb-2"></i>
+                <h6 class="text-warning fw-bold">Stage 1 of 2</h6>
+                <p class="small text-muted mb-0">With Finance Manager for review. You will be notified of the outcome.</p>
+            </div>
+        </div>
+        {% elif batch.status == 'PENDING_DIRECTOR' %}
+        <div class="dashboard-card border-info">
+            <div class="card-body text-center p-3">
+                <i class="fas fa-crown fa-2x text-info mb-2"></i>
+                <h6 class="text-info fw-bold">Stage 2 of 2</h6>
+                <p class="small text-muted mb-0">FM review complete. Awaiting Director's final approval.</p>
             </div>
         </div>
         {% endif %}
     </div>
 </div>
 
-<!-- Transactions Table -->
+
+<!-- ================================================================
+     TRANSACTIONS TABLE
+     ================================================================ -->
 <div class="dashboard-card">
     <div class="card-header">
         <h5 class="mb-0">
@@ -236,40 +626,50 @@
             <span class="badge bg-primary ms-2">{{ transactions.count }} records</span>
         </h5>
     </div>
-    <div class="card-body">
+    <div class="card-body p-0">
         {% if transactions %}
         <div class="table-responsive">
-            <table class="table table-hover table-bordered align-middle">
+            <table class="table table-hover table-bordered align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th width="50">Seq</th>
+                        <th width="50" class="text-center">Seq</th>
                         <th>Debit Account</th>
                         <th>Supplier</th>
                         <th>Bank</th>
                         <th>Account No</th>
-                        <th>Scheme</th>
-                        <th>Zone</th>
+                        <th class="text-center">Scheme</th>
+                        <th class="text-center">Zone</th>
                         <th class="text-end">Amount (MWK)</th>
-                        <th>Narration</th>
+                        <th>Invoice / Ref</th>
+                        <th>Description</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for trans in transactions %}
                     <tr>
                         <td class="text-center"><strong>#{{ trans.sequence_number }}</strong></td>
-                        <td><code>{{ trans.debit_account.account_number }}</code></td>
+                        <td>
+                            <code>{{ trans.debit_account.account_number }}</code><br>
+                            <small class="text-muted">{{ trans.debit_account.account_name|truncatechars:20 }}</small>
+                        </td>
                         <td>
                             <strong>{{ trans.supplier.supplier_name }}</strong><br>
                             <small class="text-muted">{{ trans.supplier.supplier_code }}</small>
                         </td>
                         <td>{{ trans.supplier.bank.bank_name }}</td>
                         <td><code>{{ trans.supplier.account_number }}</code></td>
-                        <td><span class="badge bg-info">{{ trans.scheme.scheme_code }}</span></td>
-                        <td><span class="badge bg-secondary">{{ trans.zone.zone_code }}</span></td>
+                        <td class="text-center"><span class="badge bg-info">{{ trans.scheme.scheme_code }}</span></td>
+                        <td class="text-center"><span class="badge bg-secondary">{{ trans.zone.zone_code }}</span></td>
                         <td class="text-end"><strong>{{ trans.amount|floatformat:2 }}</strong></td>
                         <td>
-                            <div class="text-truncate" style="max-width: 200px;" title="{{ trans.narration }}">
-                                {{ trans.narration }}
+                            <small class="fw-bold d-block">{{ trans.reference_number }}</small>
+                            {% if trans.source_reference %}
+                            <small class="text-muted">IFMIS: {{ trans.source_reference }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width:180px;" title="{{ trans.narration }}">
+                                {{ trans.narration|default:"—" }}
                             </div>
                         </td>
                     </tr>
@@ -279,70 +679,72 @@
                     <tr>
                         <th colspan="7" class="text-end">GRAND TOTAL:</th>
                         <th class="text-end">MWK {{ batch.total_amount|floatformat:2 }}</th>
-                        <th></th>
+                        <th colspan="2"></th>
                     </tr>
                 </tfoot>
             </table>
         </div>
         {% else %}
-        <div class="alert alert-warning">
+        <div class="alert alert-warning m-3 mb-0">
             <i class="fas fa-exclamation-triangle"></i> No transactions found in this batch.
         </div>
         {% endif %}
     </div>
 </div>
 
-<!-- Audit Log -->
+
+<!-- ================================================================
+     AUDIT TRAIL
+     ================================================================ -->
 {% if audit_logs %}
 <div class="dashboard-card mt-4">
     <div class="card-header bg-info text-white">
-        <h5 class="mb-0">
-            <i class="fas fa-history"></i> Audit Trail
-        </h5>
+        <h5 class="mb-0"><i class="fas fa-history"></i> Audit Trail</h5>
     </div>
-    <div class="card-body">
-        <div class="timeline">
-            {% for log in audit_logs %}
-            <div class="d-flex mb-3 pb-3 border-bottom">
-                <div class="me-3">
-                    {% if log.action == 'CREATED' %}
-                    <i class="fas fa-plus-circle fa-2x text-primary"></i>
-                    {% elif log.action == 'SUBMITTED' %}
-                    <i class="fas fa-paper-plane fa-2x text-info"></i>
-                    {% elif log.action == 'APPROVED' %}
-                    <i class="fas fa-check-circle fa-2x text-success"></i>
-                    {% elif log.action == 'REJECTED' %}
-                    <i class="fas fa-times-circle fa-2x text-danger"></i>
-                    {% endif %}
-                </div>
-                <div class="flex-grow-1">
-                    <div class="d-flex justify-content-between">
-                        <strong>
-                            {% if log.action == 'CREATED' %}
-                            Batch Created
-                            {% elif log.action == 'SUBMITTED' %}
-                            Submitted for Approval
-                            {% elif log.action == 'APPROVED' %}
-                            Batch Approved
-                            {% elif log.action == 'REJECTED' %}
-                            Batch Rejected
-                            {% endif %}
-                        </strong>
-                        <small class="text-muted">{{ log.timestamp|date:"d M Y H:i" }}</small>
-                    </div>
-                    <small class="text-muted">
-                        by {{ log.user.get_full_name|default:log.user.username }}
-                    </small>
-                    {% if log.remarks %}
-                    <div class="mt-2 p-2 bg-light rounded">
-                        <small><i class="fas fa-comment"></i> {{ log.remarks }}</small>
-                    </div>
-                    {% endif %}
-                </div>
+    <div class="card-body p-3">
+        {% for log in audit_logs %}
+        <div class="timeline-item">
+            <div class="timeline-icon
+                {% if log.action == 'SUBMITTED' %}tl-submitted
+                {% elif log.action == 'FM_REVIEWED' %}tl-fm
+                {% elif log.action == 'FM_REJECTED' %}tl-fmreject
+                {% elif log.action == 'APPROVED' %}tl-approved
+                {% elif log.action == 'REJECTED' %}tl-rejected
+                {% elif log.action == 'EXPORTED' %}tl-exported
+                {% else %}tl-created{% endif %}">
+                {% if log.action == 'SUBMITTED' %}<i class="fas fa-paper-plane"></i>
+                {% elif log.action == 'FM_REVIEWED' %}<i class="fas fa-user-tie"></i>
+                {% elif log.action == 'FM_REJECTED' %}<i class="fas fa-times"></i>
+                {% elif log.action == 'APPROVED' %}<i class="fas fa-check"></i>
+                {% elif log.action == 'REJECTED' %}<i class="fas fa-ban"></i>
+                {% elif log.action == 'EXPORTED' %}<i class="fas fa-file-export"></i>
+                {% else %}<i class="fas fa-plus"></i>{% endif %}
             </div>
-            {% endfor %}
+            <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start">
+                    <strong>
+                        {% if log.action == 'CREATED' %}Batch Created
+                        {% elif log.action == 'SUBMITTED' %}Submitted to Finance Manager
+                        {% elif log.action == 'FM_REVIEWED' %}Reviewed by Finance Manager — Forwarded to Director
+                        {% elif log.action == 'FM_REJECTED' %}Rejected by Finance Manager
+                        {% elif log.action == 'APPROVED' %}Approved by Director of Finance
+                        {% elif log.action == 'REJECTED' %}Rejected by Director of Finance
+                        {% elif log.action == 'EXPORTED' %}Exported to RBM
+                        {% else %}{{ log.get_action_display }}{% endif %}
+                    </strong>
+                    <small class="text-muted text-nowrap ms-3">{{ log.timestamp|date:"d M Y H:i" }}</small>
+                </div>
+                <small class="text-muted">by {{ log.user.get_full_name|default:log.user.username }}</small>
+                {% if log.remarks %}
+                <div class="mt-1 px-2 py-1 bg-light rounded">
+                    <small><i class="fas fa-comment text-muted me-1"></i>{{ log.remarks }}</small>
+                </div>
+                {% endif %}
+            </div>
         </div>
+        {% endfor %}
     </div>
 </div>
 {% endif %}
+
 {% endblock %}

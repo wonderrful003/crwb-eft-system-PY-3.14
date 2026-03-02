@@ -1,4 +1,4 @@
-# eft_app/forms.py - COMPLETE FIXED VERSION
+# eft_app/forms.py - COMPLETE FIXED VERSION WITH IMPROVED LABELS
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.contrib.auth.models import User, Group
@@ -7,15 +7,22 @@ from .models import (
     EFTBatch, EFTTransaction, ApprovalAuditLog
 )
 
+# Updated role choices - Authorizer removed
+ROLE_CHOICES = [
+    ('System Admin', 'System Admin'),
+    ('Accounts Personnel', 'Accounts Personnel'),
+    ('Finance Manager', 'Finance Manager'),
+    ('Director of Finance', 'Director of Finance'),
+]
+
 class UserRegistrationForm(UserCreationForm):
     email = forms.EmailField(required=True, widget=forms.EmailInput(attrs={'class': 'form-control'}))
     first_name = forms.CharField(required=True, widget=forms.TextInput(attrs={'class': 'form-control'}))
     last_name = forms.CharField(required=True, widget=forms.TextInput(attrs={'class': 'form-control'}))
-    role = forms.ChoiceField(choices=[
-        ('System Admin', 'System Admin'),
-        ('Accounts Personnel', 'Accounts Personnel'),
-        ('Authorizer', 'Authorizer'),
-    ], widget=forms.Select(attrs={'class': 'form-control'}))
+    role = forms.ChoiceField(
+        choices=ROLE_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
     
     # Add password fields with proper widgets
     password1 = forms.CharField(
@@ -58,14 +65,10 @@ class UserRegistrationForm(UserCreationForm):
                     user.is_staff = True
                     user.save()
         return user
+
 class UserEditForm(forms.ModelForm):
     role = forms.ChoiceField(
-        choices=[
-            ('', 'Select Role'),
-            ('System Admin', 'System Admin'),
-            ('Accounts Personnel', 'Accounts Personnel'),
-            ('Authorizer', 'Authorizer'),
-        ], 
+        choices=[('', 'Select Role')] + ROLE_CHOICES,
         required=False,
         widget=forms.Select(attrs={'class': 'form-control'})
     )
@@ -141,7 +144,7 @@ class SchemeForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['default_cost_center'].help_text = "Default cost center for this scheme"
+        self.fields['default_cost_center'].help_text = "Default cost center for this scheme (auto-filled in transactions)"
 
 class SupplierForm(forms.ModelForm):
     class Meta:
@@ -192,45 +195,134 @@ class EFTBatchForm(forms.ModelForm):
         }
 
 class EFTTransactionForm(forms.ModelForm):
+    """RBM-Compliant Transaction Form - All fields are MANUAL entry except auto-filled zone"""
+    
+    # Override field labels for clarity
+    reference_number = forms.CharField(
+        label="Invoice Number / Payee Reference",
+        max_length=16,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., INV-2025-00123'
+        }),
+        help_text="Enter the actual invoice number from the vendor"
+    )
+    
+    source_reference = forms.CharField(
+        label="Source Reference (IFMIS)",
+        max_length=18,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., 030TRF2100102000'
+        }),
+        help_text="Enter the IFMIS reference number (provided by finance)"
+    )
+    
+    narration = forms.CharField(
+        label="Description / Payment Details",
+        max_length=200,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., Payment for office supplies - March 2025'
+        }),
+        help_text="Clear description of what this payment is for"
+    )
+    
+    employee_number = forms.CharField(
+        label="Employee Number (Optional)",
+        max_length=6,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., EMP123'
+        }),
+        help_text="Only for employee payments (UDF2 at UBS)"
+    )
+    
+    national_id = forms.CharField(
+        label="National ID (Optional)",
+        max_length=8,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g., 12345678'
+        }),
+        help_text="Only for individual payments (UDF3 at UBS)"
+    )
+    
+    cost_center = forms.CharField(
+        label="Cost Center (Auto-filled from Scheme, but can override)",
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Will auto-fill from scheme'
+        }),
+        help_text="Auto-filled from scheme - you can override if needed"
+    )
+    
     class Meta:
         model = EFTTransaction
         fields = [
             'debit_account', 'supplier', 'scheme', 'amount',
-            'narration', 'reference_number', 'employee_number',
-            'national_id', 'cost_center', 'source_reference'
+            'reference_number', 'source_reference', 'narration',
+            'employee_number', 'national_id', 'cost_center'
         ]
         widgets = {
-            'debit_account': forms.Select(attrs={'class': 'form-control'}),
-            'supplier': forms.Select(attrs={'class': 'form-control'}),
-            'scheme': forms.Select(attrs={'class': 'form-control'}),
-            'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'narration': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Description of transaction'}),
-            'reference_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Invoice Number'}),
-            'employee_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Optional'}),
-            'national_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Optional'}),
-            'cost_center': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 03000101'}),
-            'source_reference': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IFMIS reference'}),
+            'debit_account': forms.Select(attrs={
+                'class': 'form-control',
+                'required': 'required'
+            }),
+            'supplier': forms.Select(attrs={
+                'class': 'form-control',
+                'required': 'required'
+            }),
+            'scheme': forms.Select(attrs={
+                'class': 'form-control',
+                'required': 'required'
+            }),
+            'amount': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'min': '0.01',
+                'placeholder': '0.00'
+            }),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Filter active records
         self.fields['supplier'].queryset = Supplier.objects.filter(is_active=True)
         self.fields['scheme'].queryset = Scheme.objects.filter(is_active=True)
         self.fields['debit_account'].queryset = DebitAccount.objects.filter(is_active=True)
         
-        self.fields['reference_number'].help_text = "Payees Reference Number/Invoice Number"
-        self.fields['narration'].help_text = "Description of the transaction (max 200 chars)"
+        # Mark required fields
+        required_fields = ['debit_account', 'supplier', 'scheme', 'amount', 
+                          'reference_number', 'source_reference', 'narration']
+        for field in required_fields:
+            self.fields[field].required = True
+        
+        # Help text for RBM compliance
+        self.fields['amount'].help_text = "Enter the exact amount from the invoice (required)"
+        self.fields['reference_number'].help_text = "⚠️ MANUAL ENTRY: Enter the actual invoice number from the vendor"
+        self.fields['source_reference'].help_text = "⚠️ MANUAL ENTRY: Enter the IFMIS reference number"
+        self.fields['narration'].help_text = "Clear description of the payment purpose"
+        self.fields['cost_center'].help_text = "Auto-filled from scheme - you can override if different from default"
 
 class BatchApprovalForm(forms.Form):
     remarks = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        label='Approval Remarks'
+        label='Approval Remarks (Optional)'
     )
 
 class BatchRejectionForm(forms.Form):
     rejection_reason = forms.CharField(
         required=True,
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        label='Rejection Reason'
+        label='Rejection Reason',
+        help_text="Please explain why this batch is being rejected (visible to Accounts Personnel)"
     )

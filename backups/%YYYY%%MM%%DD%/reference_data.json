@@ -1,0 +1,639 @@
+[
+{
+  "model": "eft_app.bank",
+  "pk": 1,
+  "fields": {
+    "bank_name": "National Bank of Malawi",
+    "swift_code": "NBMAMWMW",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-01-19T08:25:01.841Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 2,
+  "fields": {
+    "bank_name": "Standard Bank PLC",
+    "swift_code": "SBICMWMX",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-01-19T08:25:02.038Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 3,
+  "fields": {
+    "bank_name": "Reserve Bank of Malawi",
+    "swift_code": "RBMAMWMW",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-01-19T08:25:02.221Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 4,
+  "fields": {
+    "bank_name": "FDH Bank PLC",
+    "swift_code": "FDHFMWMW",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-01-19T08:25:02.421Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 5,
+  "fields": {
+    "bank_name": "NBS Bank PLC",
+    "swift_code": "NBSTMWMW",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-01-19T08:25:02.680Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 6,
+  "fields": {
+    "bank_name": "wonder",
+    "swift_code": "WNTMWM12344",
+    "is_active": false,
+    "created_by": 3,
+    "created_at": "2026-01-27T12:02:07.455Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 7,
+  "fields": {
+    "bank_name": "Centenary Bank Limited",
+    "swift_code": "MBBCMWMW",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-02-09T11:07:50Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 8,
+  "fields": {
+    "bank_name": "First Capital Bank PLC",
+    "swift_code": "FRCGMWMW",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-02-09T11:07:50Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 9,
+  "fields": {
+    "bank_name": "Ecobank Malawi Limited",
+    "swift_code": "ECOCMWMW",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-02-09T11:07:50Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 10,
+  "fields": {
+    "bank_name": "CDH Investment Bank",
+    "swift_code": "CDHIMWMW",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-02-09T11:07:50Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 11,
+  "fields": {
+    "bank_name": "MyBucks Banking Corporation",
+    "swift_code": "NFBMMWMW",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-02-09T11:07:50Z"
+  }
+},
+{
+  "model": "eft_app.bank",
+  "pk": 12,
+  "fields": {
+    "bank_name": "First Discount House Limited",
+    "swift_code": "FDHDMWMW",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-02-09T11:07:50Z"
+  }
+},
+{
+  "model": "eft_app.zone",
+  "pk": 1,
+  "fields": {
+    "zone_code": "HQ_ADMIN",
+    "zone_name": "Headquarters (Lilongwe)",
+    "description": "",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:00.184Z"
+  }
+},
+{
+  "model": "eft_app.zone",
+  "pk": 2,
+  "fields": {
+    "zone_code": "KS_ZONE",
+    "zone_name": "Kasungu Zone",
+    "description": "",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:00.347Z"
+  }
+},
+{
+  "model": "eft_app.zone",
+  "pk": 3,
+  "fields": {
+    "zone_code": "MP_ZONE",
+    "zone_name": "Mponela Zone",
+    "description": "",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:00.504Z"
+  }
+},
+{
+  "model": "eft_app.zone",
+  "pk": 4,
+  "fields": {
+    "zone_code": "SL_ZONE",
+    "zone_name": "Salima Zone",
+    "description": "",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:00.657Z"
+  }
+},
+{
+  "model": "eft_app.zone",
+  "pk": 5,
+  "fields": {
+    "zone_code": "DZ_ZONE",
+    "zone_name": "Dedza Zone",
+    "description": "",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:00.805Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 1,
+  "fields": {
+    "scheme_code": "03000101",
+    "scheme_name": "HQ Administration",
+    "zone": 1,
+    "default_cost_center": "03000101",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:00.947Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 2,
+  "fields": {
+    "scheme_code": "10019525",
+    "scheme_name": "Mponela Main Scheme",
+    "zone": 3,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:01.114Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 3,
+  "fields": {
+    "scheme_code": "10019524",
+    "scheme_name": "Salima Town Scheme",
+    "zone": 4,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:01.305Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 4,
+  "fields": {
+    "scheme_code": "10019523",
+    "scheme_name": "Dedza Boma Scheme",
+    "zone": 5,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:01.456Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 5,
+  "fields": {
+    "scheme_code": "10019530",
+    "scheme_name": "Kasungu Boma Scheme",
+    "zone": 2,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:01.700Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 6,
+  "fields": {
+    "scheme_code": "SALIMA_01",
+    "scheme_name": "Salima",
+    "zone": 4,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 7,
+  "fields": {
+    "scheme_code": "SALIMA_02",
+    "scheme_name": "Salima Lakeshore",
+    "zone": 4,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 8,
+  "fields": {
+    "scheme_code": "SALIMA_03",
+    "scheme_name": "Nkhotakota",
+    "zone": 4,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 9,
+  "fields": {
+    "scheme_code": "SALIMA_04",
+    "scheme_name": "Chipoka",
+    "zone": 4,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 10,
+  "fields": {
+    "scheme_code": "SALIMA_05",
+    "scheme_name": "Dwangwa",
+    "zone": 4,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 11,
+  "fields": {
+    "scheme_code": "DEDZA_01",
+    "scheme_name": "Dedza",
+    "zone": 5,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 12,
+  "fields": {
+    "scheme_code": "DEDZA_02",
+    "scheme_name": "Ntcheu",
+    "zone": 5,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 13,
+  "fields": {
+    "scheme_code": "DEDZA_03",
+    "scheme_name": "Bunda/Mitundu",
+    "zone": 5,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 14,
+  "fields": {
+    "scheme_code": "DEDZA_04",
+    "scheme_name": "Bembeke",
+    "zone": 5,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 15,
+  "fields": {
+    "scheme_code": "KASUNGU_01",
+    "scheme_name": "Kasungu",
+    "zone": 2,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 16,
+  "fields": {
+    "scheme_code": "KASUNGU_02",
+    "scheme_name": "Mchinji",
+    "zone": 2,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 17,
+  "fields": {
+    "scheme_code": "KASUNGU_03",
+    "scheme_name": "Kochilira-Kamwendo",
+    "zone": 2,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 18,
+  "fields": {
+    "scheme_code": "KASUNGU_04",
+    "scheme_name": "Santhe",
+    "zone": 2,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 19,
+  "fields": {
+    "scheme_code": "KASUNGU_05",
+    "scheme_name": "Mkanda",
+    "zone": 2,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 20,
+  "fields": {
+    "scheme_code": "KASUNGU_06",
+    "scheme_name": "Kamwendo",
+    "zone": 2,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 21,
+  "fields": {
+    "scheme_code": "KASUNGU_07",
+    "scheme_name": "Mchinji Border",
+    "zone": 2,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 22,
+  "fields": {
+    "scheme_code": "MPONELA_01",
+    "scheme_name": "Mponela",
+    "zone": 3,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 23,
+  "fields": {
+    "scheme_code": "MPONELA_02",
+    "scheme_name": "Madisi",
+    "zone": 3,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 24,
+  "fields": {
+    "scheme_code": "MPONELA_03",
+    "scheme_name": "Ntchisi",
+    "zone": 3,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.scheme",
+  "pk": 25,
+  "fields": {
+    "scheme_code": "MPONELA_04",
+    "scheme_name": "Dowa",
+    "zone": 3,
+    "default_cost_center": "",
+    "is_active": true,
+    "created_at": "2026-02-09T11:10:15Z"
+  }
+},
+{
+  "model": "eft_app.supplier",
+  "pk": 1,
+  "fields": {
+    "supplier_code": "57819",
+    "supplier_name": "Bella Enterprise Pvt Ltd",
+    "bank": 1,
+    "account_number": "2004004560001",
+    "account_name": "Bella Enterprise Main",
+    "employee_number": "",
+    "national_id": "",
+    "credit_reference": "",
+    "cost_center": "",
+    "source": "",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-01-19T08:32:11.427Z"
+  }
+},
+{
+  "model": "eft_app.supplier",
+  "pk": 2,
+  "fields": {
+    "supplier_code": "3",
+    "supplier_name": "Anderson",
+    "bank": 2,
+    "account_number": "91000004",
+    "account_name": "Anderson Trading",
+    "employee_number": "",
+    "national_id": "",
+    "credit_reference": "",
+    "cost_center": "",
+    "source": "",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-01-19T08:32:11.585Z"
+  }
+},
+{
+  "model": "eft_app.supplier",
+  "pk": 3,
+  "fields": {
+    "supplier_code": "408",
+    "supplier_name": "CCSECUR",
+    "bank": 2,
+    "account_number": "12345612",
+    "account_name": "City Center Security",
+    "employee_number": "",
+    "national_id": "",
+    "credit_reference": "",
+    "cost_center": "",
+    "source": "",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-01-19T08:32:11.743Z"
+  }
+},
+{
+  "model": "eft_app.supplier",
+  "pk": 4,
+  "fields": {
+    "supplier_code": "391",
+    "supplier_name": "JIBSSEC",
+    "bank": 2,
+    "account_number": "12345678",
+    "account_name": "Jibs Security Services",
+    "employee_number": "",
+    "national_id": "",
+    "credit_reference": "",
+    "cost_center": "",
+    "source": "",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-01-19T08:32:11.885Z"
+  }
+},
+{
+  "model": "eft_app.supplier",
+  "pk": 5,
+  "fields": {
+    "supplier_code": "392",
+    "supplier_name": "EASYACC",
+    "bank": 2,
+    "account_number": "12345698",
+    "account_name": "Easy Access Solutions",
+    "employee_number": "",
+    "national_id": "",
+    "credit_reference": "",
+    "cost_center": "",
+    "source": "",
+    "is_active": true,
+    "created_by": 1,
+    "created_at": "2026-01-19T08:32:12.118Z"
+  }
+},
+{
+  "model": "eft_app.debitaccount",
+  "pk": 1,
+  "fields": {
+    "account_number": "13006161244",
+    "account_name": "(ORT) MG Other Recurrent Expenditure A/C",
+    "description": "CRWB (ORT) MG Other Recurrent Expenditure A/C",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:02.864Z"
+  }
+},
+{
+  "model": "eft_app.debitaccount",
+  "pk": 2,
+  "fields": {
+    "account_number": "13006161245",
+    "account_name": "(ORT) MG Capital Expenditure A/C",
+    "description": "CRWB (ORT) MG Capital Expenditure A/C",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:02.997Z"
+  }
+},
+{
+  "model": "eft_app.debitaccount",
+  "pk": 3,
+  "fields": {
+    "account_number": "13006161246",
+    "account_name": "(ORT) MG Salaries A/C",
+    "description": "CRWB (ORT) MG Salaries A/C",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:03.155Z"
+  }
+},
+{
+  "model": "eft_app.debitaccount",
+  "pk": 4,
+  "fields": {
+    "account_number": "13006161247",
+    "account_name": "(ORT) MG Project Funds A/C",
+    "description": "CRWB (ORT) MG Project Funds A/C",
+    "is_active": true,
+    "created_at": "2026-01-19T08:25:03.347Z"
+  }
+},
+{
+  "model": "eft_app.debitaccount",
+  "pk": 5,
+  "fields": {
+    "account_number": "34456699805",
+    "account_name": "TEST",
+    "description": "",
+    "is_active": true,
+    "created_at": "2026-01-23T06:48:47.950Z"
+  }
+}
+]

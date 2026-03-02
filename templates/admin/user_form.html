@@ -22,13 +22,13 @@
             <div class="card-body">
                 <form method="post">
                     {% csrf_token %}
-                    
+
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.username.id_for_label }}" class="form-label">
                                 Username <span class="text-danger">*</span>
                             </label>
-                            <input type="text" name="username" id="{{ form.username.id_for_label }}" 
+                            <input type="text" name="username" id="{{ form.username.id_for_label }}"
                                    class="form-control" required>
                             {% if form.username.errors %}
                             <div class="text-danger small">{{ form.username.errors }}</div>
@@ -39,7 +39,7 @@
                             <label for="{{ form.email.id_for_label }}" class="form-label">
                                 Email <span class="text-danger">*</span>
                             </label>
-                            <input type="email" name="email" id="{{ form.email.id_for_label }}" 
+                            <input type="email" name="email" id="{{ form.email.id_for_label }}"
                                    class="form-control" required>
                             {% if form.email.errors %}
                             <div class="text-danger small">{{ form.email.errors }}</div>
@@ -49,18 +49,13 @@
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="{{ form.first_name.id_for_label }}" class="form-label">
-                                First Name
-                            </label>
-                            <input type="text" name="first_name" id="{{ form.first_name.id_for_label }}" 
+                            <label for="{{ form.first_name.id_for_label }}" class="form-label">First Name</label>
+                            <input type="text" name="first_name" id="{{ form.first_name.id_for_label }}"
                                    class="form-control">
                         </div>
-
                         <div class="col-md-6 mb-3">
-                            <label for="{{ form.last_name.id_for_label }}" class="form-label">
-                                Last Name
-                            </label>
-                            <input type="text" name="last_name" id="{{ form.last_name.id_for_label }}" 
+                            <label for="{{ form.last_name.id_for_label }}" class="form-label">Last Name</label>
+                            <input type="text" name="last_name" id="{{ form.last_name.id_for_label }}"
                                    class="form-control">
                         </div>
                     </div>
@@ -73,11 +68,18 @@
                             <option value="">-- Select Role --</option>
                             <option value="System Admin">System Admin</option>
                             <option value="Accounts Personnel">Accounts Personnel</option>
-                            <option value="Authorizer">Authorizer</option>
+                            <option value="Finance Manager">Finance Manager</option>
+                            <option value="Director of Finance">Director of Finance</option>
                         </select>
                         {% if form.role.errors %}
                         <div class="text-danger small">{{ form.role.errors }}</div>
                         {% endif %}
+                        <small class="form-text text-muted">
+                            <strong>System Admin</strong> — manages reference data &amp; users |
+                            <strong>Accounts Personnel</strong> — creates &amp; submits batches |
+                            <strong>Finance Manager</strong> — Stage 1 reviewer |
+                            <strong>Director of Finance</strong> — Final approver
+                        </small>
                     </div>
 
                     <div class="row">
@@ -85,21 +87,18 @@
                             <label for="{{ form.password1.id_for_label }}" class="form-label">
                                 Password <span class="text-danger">*</span>
                             </label>
-                            <input type="password" name="password1" id="{{ form.password1.id_for_label }}" 
+                            <input type="password" name="password1" id="{{ form.password1.id_for_label }}"
                                    class="form-control" required>
-                            <small class="form-text text-muted">
-                                Password must be at least 8 characters long
-                            </small>
+                            <small class="form-text text-muted">Minimum 8 characters</small>
                             {% if form.password1.errors %}
                             <div class="text-danger small">{{ form.password1.errors }}</div>
                             {% endif %}
                         </div>
-
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.password2.id_for_label }}" class="form-label">
                                 Confirm Password <span class="text-danger">*</span>
                             </label>
-                            <input type="password" name="password2" id="{{ form.password2.id_for_label }}" 
+                            <input type="password" name="password2" id="{{ form.password2.id_for_label }}"
                                    class="form-control" required>
                             {% if form.password2.errors %}
                             <div class="text-danger small">{{ form.password2.errors }}</div>

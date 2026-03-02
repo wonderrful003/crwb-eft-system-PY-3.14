@@ -45,10 +45,12 @@ def dashboard(request):
         return redirect('admin_dashboard')
     elif user.groups.filter(name='Accounts Personnel').exists():
         return redirect('accounts_dashboard')
-    elif user.groups.filter(name='Authorizer').exists():
-        return redirect('authorizer_dashboard')
+    elif user.groups.filter(name='Finance Manager').exists():
+        return redirect('fm_dashboard')
+    elif user.groups.filter(name='Director of Finance').exists():
+        return redirect('director_dashboard')
     else:
-        messages.warning(request, 'No role assigned. Contact administrator.')
+        messages.warning(request, 'No role assigned. Contact your system administrator.')
         return redirect('logout')
 
 # ================ SYSTEM ADMIN VIEWS ================
@@ -213,7 +215,7 @@ def api_system_activity(request):
                     'icon': 'fas fa-university',
                     'icon_color': 'bg-primary',
                     'title': 'Bank Added',
-                    'description': f'Bank "{bank.bank_name}" ({bank.code}) configured',
+                    'description': f'Bank "{bank.bank_name}" configured',
                     'time': format_time_ago(bank.created_at) if bank.created_at else 'Recently'
                 })
         except:
@@ -334,7 +336,7 @@ def user_list(request):
         match role_filter:
             case 'Superuser':
                 users = users.filter(is_superuser=True)
-            case 'System Admin' | 'Accounts Personnel' | 'Authorizer':
+            case 'System Admin' | 'Accounts Personnel' | 'Finance Manager' | 'Director of Finance':
                 users = users.filter(groups__name=role_filter)
     
     status_filter = request.GET.get('status')
@@ -450,17 +452,63 @@ def user_edit(request, user_id):
 @user_passes_test(is_system_admin)
 @require_POST
 def user_delete(request, user_id):
-    """Delete user"""
+    """Actually delete the user — only called from confirmation POST"""
     user_obj = get_object_or_404(User, id=user_id)
     
     if user_obj == request.user:
         messages.error(request, 'You cannot delete your own account')
         return redirect('user_list')
     
+    if user_obj.is_superuser:
+        messages.error(request, 'Cannot delete superuser accounts')
+        return redirect('user_list')
+    
     username = user_obj.username
     user_obj.delete()
     messages.success(request, f'User "{username}" deleted successfully')
     return redirect('user_list')
+
+@login_required
+@user_passes_test(is_system_admin)
+def user_delete_confirm(request, user_id):
+    """
+    Display user delete confirmation page
+    GET  → show confirmation page with user info and activity summary
+    POST → perform the actual deletion (calls user_delete)
+    """
+    user_obj = get_object_or_404(User, id=user_id)
+   
+    # Gather stats to show on confirmation page
+    try:
+        batches_created    = EFTBatch.objects.filter(created_by=user_obj).count()
+        batches_approved   = EFTBatch.objects.filter(approved_by=user_obj).count()
+        banks_created      = Bank.objects.filter(created_by=user_obj).count()
+        suppliers_created  = Supplier.objects.filter(created_by=user_obj).count()
+    except Exception:
+        batches_created = batches_approved = banks_created = suppliers_created = 0
+   
+    has_activity = any([
+        batches_created > 0,
+        batches_approved > 0,
+        banks_created > 0,
+        suppliers_created > 0
+    ])
+   
+    context = {
+        'user_obj': user_obj,
+        'batches_created': batches_created,
+        'batches_approved': batches_approved,
+        'banks_created': banks_created,
+        'suppliers_created': suppliers_created,
+        'has_activity': has_activity,
+    }
+   
+    if request.method == 'POST':
+        # User confirmed deletion → execute delete
+        return user_delete(request, user_id)
+   
+    # Show confirmation page
+    return render(request, 'admin/user_confirm_delete.html', context)
 
 @login_required
 @user_passes_test(is_system_admin)
@@ -728,8 +776,8 @@ def export_banks(request):
                 bank.code,
                 bank.swift_code,
                 'Active' if bank.is_active else 'Inactive',
-                bank.created_by.get_full_name() or bank.created_by.username,
-                bank.created_at.strftime('%Y-%m-%d')
+                bank.created_by.get_full_name() or bank.created_by.username if bank.created_by else 'N/A',
+                bank.created_at.strftime('%Y-%m-%d') if bank.created_at else 'N/A'
             ])
         
         return response
@@ -753,8 +801,8 @@ def export_banks(request):
             ws.write(row_num, 1, bank.code or '')
             ws.write(row_num, 2, bank.swift_code)
             ws.write(row_num, 3, 'Active' if bank.is_active else 'Inactive')
-            ws.write(row_num, 4, bank.created_by.get_full_name() or bank.created_by.username)
-            ws.write(row_num, 5, bank.created_at.strftime('%Y-%m-%d'))
+            ws.write(row_num, 4, bank.created_by.get_full_name() or bank.created_by.username if bank.created_by else 'N/A')
+            ws.write(row_num, 5, bank.created_at.strftime('%Y-%m-%d') if bank.created_at else 'N/A')
         
         wb.save(response)
         return response
@@ -935,7 +983,7 @@ def export_zones(request):
                 zone.zone_name,
                 zone.description or '',
                 'Active' if zone.is_active else 'Inactive',
-                zone.created_at.strftime('%Y-%m-%d')
+                zone.created_at.strftime('%Y-%m-%d') if zone.created_at else 'N/A'
             ])
         
         return response
@@ -959,7 +1007,7 @@ def export_zones(request):
             ws.write(row_num, 1, zone.zone_name)
             ws.write(row_num, 2, zone.description or '')
             ws.write(row_num, 3, 'Active' if zone.is_active else 'Inactive')
-            ws.write(row_num, 4, zone.created_at.strftime('%Y-%m-%d'))
+            ws.write(row_num, 4, zone.created_at.strftime('%Y-%m-%d') if zone.created_at else 'N/A')
         
         wb.save(response)
         return response
@@ -1158,12 +1206,12 @@ def export_suppliers(request):
             writer.writerow([
                 supplier.supplier_code,
                 supplier.supplier_name,
-                supplier.bank.bank_name,
+                supplier.bank.bank_name if supplier.bank else 'N/A',
                 supplier.account_number,
                 supplier.account_name,
                 'Active' if supplier.is_active else 'Inactive',
-                supplier.created_by.get_full_name() or supplier.created_by.username,
-                supplier.created_at.strftime('%Y-%m-%d')
+                supplier.created_by.get_full_name() or supplier.created_by.username if supplier.created_by else 'N/A',
+                supplier.created_at.strftime('%Y-%m-%d') if supplier.created_at else 'N/A'
             ])
         
         return response
@@ -1185,12 +1233,12 @@ def export_suppliers(request):
             row_num += 1
             ws.write(row_num, 0, supplier.supplier_code)
             ws.write(row_num, 1, supplier.supplier_name)
-            ws.write(row_num, 2, supplier.bank.bank_name)
+            ws.write(row_num, 2, supplier.bank.bank_name if supplier.bank else 'N/A')
             ws.write(row_num, 3, supplier.account_number)
             ws.write(row_num, 4, supplier.account_name)
             ws.write(row_num, 5, 'Active' if supplier.is_active else 'Inactive')
-            ws.write(row_num, 6, supplier.created_by.get_full_name() or supplier.created_by.username)
-            ws.write(row_num, 7, supplier.created_at.strftime('%Y-%m-%d'))
+            ws.write(row_num, 6, supplier.created_by.get_full_name() or supplier.created_by.username if supplier.created_by else 'N/A')
+            ws.write(row_num, 7, supplier.created_at.strftime('%Y-%m-%d') if supplier.created_at else 'N/A')
         
         wb.save(response)
         return response
@@ -1330,8 +1378,7 @@ class SchemeCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
         scheme_name = form.cleaned_data['scheme_name']
         messages.success(self.request, 
             mark_safe(f'Scheme "<strong>{scheme_name}</strong>" created successfully. '
-                      f'<a href="{reverse("scheme_list")}" class="alert-link">View all schemes</a>')
-        )
+                      f'<a href="{reverse("scheme_list")}" class="alert-link">View all schemes</a>'))
         return super().form_valid(form)
 
 class SchemeDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
@@ -1367,8 +1414,7 @@ class SchemeUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
         scheme_name = form.cleaned_data['scheme_name']
         messages.success(self.request, 
             mark_safe(f'Scheme "<strong>{scheme_name}</strong>" updated successfully. '
-                      f'<a href="{reverse("scheme_list")}" class="alert-link">View all schemes</a>')
-        )
+                      f'<a href="{reverse("scheme_list")}" class="alert-link">View all schemes</a>'))
         return super().form_valid(form)
 
 class SchemeDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
@@ -1413,10 +1459,10 @@ def export_schemes(request):
             writer.writerow([
                 scheme.scheme_code,
                 scheme.scheme_name,
-                f"{scheme.zone.zone_code} - {scheme.zone.zone_name}",
+                f"{scheme.zone.zone_code} - {scheme.zone.zone_name}" if scheme.zone else 'N/A',
                 scheme.default_cost_center or '',
                 'Active' if scheme.is_active else 'Inactive',
-                scheme.created_at.strftime('%Y-%m-%d')
+                scheme.created_at.strftime('%Y-%m-%d') if scheme.created_at else 'N/A'
             ])
         
         return response
@@ -1438,10 +1484,10 @@ def export_schemes(request):
             row_num += 1
             ws.write(row_num, 0, scheme.scheme_code)
             ws.write(row_num, 1, scheme.scheme_name)
-            ws.write(row_num, 2, f"{scheme.zone.zone_code} - {scheme.zone.zone_name}")
+            ws.write(row_num, 2, f"{scheme.zone.zone_code} - {scheme.zone.zone_name}" if scheme.zone else 'N/A')
             ws.write(row_num, 3, scheme.default_cost_center or '')
             ws.write(row_num, 4, 'Active' if scheme.is_active else 'Inactive')
-            ws.write(row_num, 5, scheme.created_at.strftime('%Y-%m-%d'))
+            ws.write(row_num, 5, scheme.created_at.strftime('%Y-%m-%d') if scheme.created_at else 'N/A')
         
         wb.save(response)
         return response
@@ -1633,7 +1679,7 @@ def export_debit_accounts(request):
                 account.account_name,
                 account.description or '',
                 'Active' if account.is_active else 'Inactive',
-                account.created_at.strftime('%Y-%m-%d')
+                account.created_at.strftime('%Y-%m-%d') if account.created_at else 'N/A'
             ])
         
         return response
@@ -1657,7 +1703,7 @@ def export_debit_accounts(request):
             ws.write(row_num, 1, account.account_name)
             ws.write(row_num, 2, account.description or '')
             ws.write(row_num, 3, 'Active' if account.is_active else 'Inactive')
-            ws.write(row_num, 4, account.created_at.strftime('%Y-%m-%d'))
+            ws.write(row_num, 4, account.created_at.strftime('%Y-%m-%d') if account.created_at else 'N/A')
         
         wb.save(response)
         return response
@@ -1720,7 +1766,7 @@ def accounts_dashboard(request):
     stats = {
         'total_batches': batches.count(),
         'draft_batches': batches.filter(status='DRAFT').count(),
-        'pending_batches': batches.filter(status='PENDING').count(),
+        'pending_batches': batches.filter(status__in=['PENDING_FM', 'PENDING_DIRECTOR']).count(),
         'approved_batches': batches.filter(status='APPROVED').count(),
         'rejected_batches': batches.filter(status='REJECTED').count(),
         'total_amount': batches.filter(status='APPROVED').aggregate(Sum('total_amount'))['total_amount__sum'] or 0,
@@ -1756,7 +1802,7 @@ def batch_list(request):
     avg_batch_size = batches.aggregate(Avg('record_count'))['record_count__avg'] or 0
     
     draft_count = EFTBatch.objects.filter(created_by=request.user, status='DRAFT').count()
-    pending_count = EFTBatch.objects.filter(created_by=request.user, status='PENDING').count()
+    pending_count = EFTBatch.objects.filter(created_by=request.user, status__in=['PENDING_FM', 'PENDING_DIRECTOR']).count()
     approved_count = EFTBatch.objects.filter(created_by=request.user, status='APPROVED').count()
     rejected_count = EFTBatch.objects.filter(created_by=request.user, status='REJECTED').count()
     
@@ -1924,30 +1970,30 @@ def delete_transaction(request, batch_id, transaction_id):
 @login_required
 @user_passes_test(is_accounts_personnel)
 def submit_for_approval(request, batch_id):
-    """Submit batch for approval"""
+    """Submit batch for Finance Manager review (Stage 1 of 2)"""
     batch = get_object_or_404(EFTBatch, id=batch_id, created_by=request.user)
-    
+
     if batch.status != 'DRAFT':
         messages.error(request, 'Only DRAFT batches can be submitted for approval')
         return redirect('view_batch', batch_id=batch.id)
-    
+
     if batch.transactions.count() == 0:
         messages.error(request, 'Cannot submit empty batch')
         return redirect('edit_batch', batch_id=batch.id)
-    
+
     with db_transaction.atomic():
-        batch.status = 'PENDING'
+        batch.status = 'PENDING_FM'
         batch.save()
-        
+
         ApprovalAuditLog.objects.create(
             batch=batch,
             action='SUBMITTED',
             user=request.user,
             ip_address=request.META.get('REMOTE_ADDR')
         )
-        
-        messages.success(request, 'Batch submitted for approval successfully')
-    
+
+        messages.success(request, 'Batch submitted to Finance Manager for review.')
+
     return redirect('accounts_dashboard')
 
 @login_required
@@ -2158,87 +2204,256 @@ def batch_bulk_delete(request):
     next_url = request.POST.get('next', 'batch_list')
     return redirect(next_url)
 
-# ================ AUTHORIZER VIEWS ================
+# ================ FINANCE MANAGER VIEWS ================
 
-def is_authorizer(user):
-    """Check if user is authorizer"""
-    return user.groups.filter(name='Authorizer').exists()
+def is_finance_manager(user):
+    return user.groups.filter(name='Finance Manager').exists()
+
+def is_director_of_finance(user):
+    return user.groups.filter(name='Director of Finance').exists()
 
 @login_required
-@user_passes_test(is_authorizer)
 def authorizer_dashboard(request):
-    """Authorizer Dashboard"""
-    pending_batches = EFTBatch.objects.filter(status='PENDING').order_by('-created_at')
-    
-    recent_approvals = EFTBatch.objects.filter(
-        status__in=['APPROVED', 'REJECTED']
-    ).order_by('-approved_at')[:10]
-    
+    # Legacy URL — redirect to appropriate new dashboard
+    if request.user.groups.filter(name='Finance Manager').exists():
+        return redirect('fm_dashboard')
+    if request.user.groups.filter(name='Director of Finance').exists():
+        return redirect('director_dashboard')
+    return redirect('dashboard')
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# STAGE 1 — Finance Manager
+# ──────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@user_passes_test(is_finance_manager)
+def fm_dashboard(request):
+    """Finance Manager Dashboard"""
+    pending_batches = EFTBatch.objects.filter(status='PENDING_FM').order_by('-created_at')
+
+    recent = EFTBatch.objects.filter(
+        status__in=['PENDING_DIRECTOR', 'APPROVED', 'REJECTED'],
+        fm_reviewed_by=request.user
+    ).order_by('-fm_reviewed_at')[:10]
+
     stats = {
         'pending_count': pending_batches.count(),
-        'approved_today': EFTBatch.objects.filter(
-            status='APPROVED',
-            approved_at__date=timezone.now().date()
+        'forwarded_today': EFTBatch.objects.filter(
+            status='PENDING_DIRECTOR',
+            fm_reviewed_at__date=timezone.now().date(),
+            fm_reviewed_by=request.user
         ).count(),
-        'total_approved': EFTBatch.objects.filter(status='APPROVED').count(),
-        'total_rejected': EFTBatch.objects.filter(status='REJECTED').count(),
+        'total_forwarded': EFTBatch.objects.filter(
+            fm_reviewed_by=request.user,
+            status__in=['PENDING_DIRECTOR', 'APPROVED']
+        ).count(),
+        'total_rejected': EFTBatch.objects.filter(
+            fm_reviewed_by=request.user,
+            status='REJECTED'
+        ).count(),
     }
-    
-    return render(request, 'authorizer/dashboard.html', {
+
+    return render(request, 'finance_manager/fm_dashboard.html', {
         'pending_batches': pending_batches,
-        'recent_approvals': recent_approvals,
+        'recent_batches': recent,
         'stats': stats
     })
 
+
 @login_required
-@user_passes_test(is_authorizer)
-def authorizer_batch_list(request):
-    """List all batches for authorizer"""
+@user_passes_test(is_finance_manager)
+def fm_batch_list(request):
     batches = EFTBatch.objects.exclude(
         Q(status='DRAFT', created_by=request.user)
     ).order_by('-created_at')
-    
     status_filter = request.GET.get('status', '')
     if status_filter:
         batches = batches.filter(status=status_filter)
-    
-    return render(request, 'authorizer/batch_list.html', {
+    return render(request, 'finance_manager/batch_list.html', {
         'batches': batches,
         'status_filter': status_filter
     })
 
-@login_required
-@user_passes_test(is_authorizer)
-def review_batch(request, batch_id):
-    """Review batch for approval/rejection"""
-    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING')
-    
-    if batch.created_by == request.user:
-        messages.error(request, 'You cannot approve or reject your own batch')
-        return redirect('authorizer_dashboard')
-    
-    transactions = batch.transactions.all().order_by('sequence_number')
-    approval_form = BatchApprovalForm()
-    rejection_form = BatchRejectionForm()
-    
-    return render(request, 'authorizer/review_batch.html', {
-        'batch': batch,
-        'transactions': transactions,
-        'approval_form': approval_form,
-        'rejection_form': rejection_form,
-        'total_amount': sum(t.amount for t in transactions)
-    })
 
 @login_required
-@user_passes_test(is_authorizer)
-def approve_batch(request, batch_id):
-    """Approve EFT batch"""
-    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING')
-    
+@user_passes_test(is_finance_manager)
+def fm_review_batch(request, batch_id):
+    """Finance Manager reviews a batch — can forward or reject"""
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_FM')
+
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot review your own batch')
+        return redirect('fm_dashboard')
+
+    transactions = batch.transactions.all().order_by('sequence_number')
+    audit_logs = batch.audit_logs.all().order_by('timestamp')
+    approval_form = BatchApprovalForm()
+    rejection_form = BatchRejectionForm()
+
+    return render(request, 'finance_manager/review_batch.html', {
+        'batch': batch,
+        'transactions': transactions,
+        'audit_logs': audit_logs,
+        'approval_form': approval_form,
+        'rejection_form': rejection_form,
+        'total_amount': sum(t.amount for t in transactions),
+    })
+
+
+@login_required
+@user_passes_test(is_finance_manager)
+def fm_forward_batch(request, batch_id):
+    """Finance Manager forwards batch to Director of Finance"""
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_FM')
+
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot forward your own batch')
+        return redirect('fm_dashboard')
+
+    if request.method == 'POST':
+        form = BatchApprovalForm(request.POST)
+        if form.is_valid():
+            with db_transaction.atomic():
+                batch.status = 'PENDING_DIRECTOR'
+                batch.fm_reviewed_by = request.user
+                batch.fm_reviewed_at = timezone.now()
+                batch.fm_remarks = form.cleaned_data.get('remarks', '')
+                batch.save()
+
+                ApprovalAuditLog.objects.create(
+                    batch=batch,
+                    action='FM_REVIEWED',
+                    user=request.user,
+                    remarks=batch.fm_remarks,
+                    ip_address=request.META.get('REMOTE_ADDR')
+                )
+
+                messages.success(request, 'Batch forwarded to Director of Finance for final approval.')
+                return redirect('fm_dashboard')
+
+    messages.error(request, 'Invalid request')
+    return redirect('fm_review_batch', batch_id=batch_id)
+
+
+@login_required
+@user_passes_test(is_finance_manager)
+def fm_reject_batch(request, batch_id):
+    """Finance Manager rejects a batch"""
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_FM')
+
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot reject your own batch')
+        return redirect('fm_dashboard')
+
+    if request.method == 'POST':
+        form = BatchRejectionForm(request.POST)
+        if form.is_valid():
+            with db_transaction.atomic():
+                batch.status = 'REJECTED'
+                batch.rejection_reason = form.cleaned_data['rejection_reason']
+                batch.fm_reviewed_by = request.user
+                batch.fm_reviewed_at = timezone.now()
+                batch.save()
+
+                ApprovalAuditLog.objects.create(
+                    batch=batch,
+                    action='FM_REJECTED',
+                    user=request.user,
+                    remarks=form.cleaned_data['rejection_reason'],
+                    ip_address=request.META.get('REMOTE_ADDR')
+                )
+
+                messages.success(request, 'Batch rejected.')
+                return redirect('fm_dashboard')
+
+    messages.error(request, 'Invalid request')
+    return redirect('fm_review_batch', batch_id=batch_id)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# STAGE 2 — Director of Finance
+# ──────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@user_passes_test(is_director_of_finance)
+def director_dashboard(request):
+    """Director of Finance Dashboard"""
+    pending_batches = EFTBatch.objects.filter(status='PENDING_DIRECTOR').order_by('-created_at')
+
+    recent = EFTBatch.objects.filter(
+        status__in=['APPROVED', 'REJECTED'],
+        approved_by=request.user
+    ).order_by('-approved_at')[:10]
+
+    stats = {
+        'pending_count': pending_batches.count(),
+        'approved_today': EFTBatch.objects.filter(
+            status='APPROVED',
+            approved_at__date=timezone.now().date(),
+            approved_by=request.user
+        ).count(),
+        'total_approved': EFTBatch.objects.filter(approved_by=request.user, status='APPROVED').count(),
+        'total_rejected': EFTBatch.objects.filter(approved_by=request.user, status='REJECTED').count(),
+    }
+
+    return render(request, 'director/director_dashboard.html', {
+        'pending_batches': pending_batches,
+        'recent_approvals': recent,
+        'stats': stats
+    })
+
+
+@login_required
+@user_passes_test(is_director_of_finance)
+def director_batch_list(request):
+    batches = EFTBatch.objects.exclude(
+        Q(status='DRAFT', created_by=request.user)
+    ).order_by('-created_at')
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        batches = batches.filter(status=status_filter)
+    return render(request, 'director/batch_list.html', {
+        'batches': batches,
+        'status_filter': status_filter
+    })
+
+
+@login_required
+@user_passes_test(is_director_of_finance)
+def director_review_batch(request, batch_id):
+    """Director of Finance reviews a batch forwarded by Finance Manager"""
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_DIRECTOR')
+
     if batch.created_by == request.user:
         messages.error(request, 'You cannot approve your own batch')
-        return redirect('authorizer_dashboard')
-    
+        return redirect('director_dashboard')
+
+    transactions = batch.transactions.all().order_by('sequence_number')
+    audit_logs = batch.audit_logs.all().order_by('timestamp')
+    approval_form = BatchApprovalForm()
+    rejection_form = BatchRejectionForm()
+
+    return render(request, 'director/review_batch.html', {
+        'batch': batch,
+        'transactions': transactions,
+        'audit_logs': audit_logs,
+        'approval_form': approval_form,
+        'rejection_form': rejection_form,
+        'total_amount': sum(t.amount for t in transactions),
+    })
+
+
+@login_required
+@user_passes_test(is_director_of_finance)
+def director_approve_batch(request, batch_id):
+    """Director of Finance gives final approval"""
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_DIRECTOR')
+
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot approve your own batch')
+        return redirect('director_dashboard')
+
     if request.method == 'POST':
         form = BatchApprovalForm(request.POST)
         if form.is_valid():
@@ -2247,31 +2462,32 @@ def approve_batch(request, batch_id):
                 batch.approved_by = request.user
                 batch.approved_at = timezone.now()
                 batch.save()
-                
+
                 ApprovalAuditLog.objects.create(
                     batch=batch,
                     action='APPROVED',
                     user=request.user,
-                    remarks=form.cleaned_data['remarks'],
+                    remarks=form.cleaned_data.get('remarks', ''),
                     ip_address=request.META.get('REMOTE_ADDR')
                 )
-                
-                messages.success(request, 'Batch approved successfully')
-                return redirect('authorizer_dashboard')
-    
+
+                messages.success(request, 'Batch approved successfully. Ready for export.')
+                return redirect('director_dashboard')
+
     messages.error(request, 'Invalid request')
-    return redirect('review_batch', batch_id=batch_id)
+    return redirect('director_review_batch', batch_id=batch_id)
+
 
 @login_required
-@user_passes_test(is_authorizer)
-def reject_batch(request, batch_id):
-    """Reject EFT batch"""
-    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING')
-    
+@user_passes_test(is_director_of_finance)
+def director_reject_batch(request, batch_id):
+    """Director of Finance rejects a batch"""
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_DIRECTOR')
+
     if batch.created_by == request.user:
         messages.error(request, 'You cannot reject your own batch')
-        return redirect('authorizer_dashboard')
-    
+        return redirect('director_dashboard')
+
     if request.method == 'POST':
         form = BatchRejectionForm(request.POST)
         if form.is_valid():
@@ -2279,7 +2495,7 @@ def reject_batch(request, batch_id):
                 batch.status = 'REJECTED'
                 batch.rejection_reason = form.cleaned_data['rejection_reason']
                 batch.save()
-                
+
                 ApprovalAuditLog.objects.create(
                     batch=batch,
                     action='REJECTED',
@@ -2287,12 +2503,112 @@ def reject_batch(request, batch_id):
                     remarks=form.cleaned_data['rejection_reason'],
                     ip_address=request.META.get('REMOTE_ADDR')
                 )
-                
-                messages.success(request, 'Batch rejected successfully')
+
+                messages.success(request, 'Batch rejected.')
+                return redirect('director_dashboard')
+
+    messages.error(request, 'Invalid request')
+    return redirect('director_review_batch', batch_id=batch_id)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Legacy authorizer views (kept for backward compatibility)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def authorizer_batch_list(request):
+    batches = EFTBatch.objects.exclude(
+        Q(status='DRAFT', created_by=request.user)
+    ).order_by('-created_at')
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        batches = batches.filter(status=status_filter)
+    return render(request, 'authorizer/batch_list.html', {
+        'batches': batches,
+        'status_filter': status_filter
+    })
+
+
+@login_required
+def review_batch(request, batch_id):
+    batch = get_object_or_404(EFTBatch, id=batch_id, status__in=['PENDING_FM', 'PENDING_DIRECTOR'])
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot review your own batch')
+        return redirect('authorizer_dashboard')
+    transactions = batch.transactions.all().order_by('sequence_number')
+    audit_logs = batch.audit_logs.all().order_by('timestamp')
+    approval_form = BatchApprovalForm()
+    rejection_form = BatchRejectionForm()
+    return render(request, 'authorizer/review_batch.html', {
+        'batch': batch,
+        'transactions': transactions,
+        'audit_logs': audit_logs,
+        'approval_form': approval_form,
+        'rejection_form': rejection_form,
+        'total_amount': sum(t.amount for t in transactions),
+    })
+
+
+@login_required
+def approve_batch(request, batch_id):
+    batch = get_object_or_404(EFTBatch, id=batch_id, status__in=['PENDING_FM', 'PENDING_DIRECTOR'])
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot approve your own batch')
+        return redirect('authorizer_dashboard')
+    if request.method == 'POST':
+        form = BatchApprovalForm(request.POST)
+        if form.is_valid():
+            with db_transaction.atomic():
+                if batch.status == 'PENDING_FM':
+                    batch.status = 'PENDING_DIRECTOR'
+                    batch.fm_reviewed_by = request.user
+                    batch.fm_reviewed_at = timezone.now()
+                    batch.fm_remarks = form.cleaned_data.get('remarks', '')
+                    batch.save()
+                    ApprovalAuditLog.objects.create(
+                        batch=batch, action='FM_REVIEWED', user=request.user,
+                        remarks=batch.fm_remarks, ip_address=request.META.get('REMOTE_ADDR')
+                    )
+                    messages.success(request, 'Batch forwarded to Director of Finance.')
+                else:
+                    batch.status = 'APPROVED'
+                    batch.approved_by = request.user
+                    batch.approved_at = timezone.now()
+                    batch.save()
+                    ApprovalAuditLog.objects.create(
+                        batch=batch, action='APPROVED', user=request.user,
+                        remarks=form.cleaned_data.get('remarks', ''),
+                        ip_address=request.META.get('REMOTE_ADDR')
+                    )
+                    messages.success(request, 'Batch approved successfully.')
                 return redirect('authorizer_dashboard')
-    
     messages.error(request, 'Invalid request')
     return redirect('review_batch', batch_id=batch_id)
+
+
+@login_required
+def reject_batch(request, batch_id):
+    batch = get_object_or_404(EFTBatch, id=batch_id, status__in=['PENDING_FM', 'PENDING_DIRECTOR'])
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot reject your own batch')
+        return redirect('authorizer_dashboard')
+    if request.method == 'POST':
+        form = BatchRejectionForm(request.POST)
+        if form.is_valid():
+            with db_transaction.atomic():
+                batch.status = 'REJECTED'
+                batch.rejection_reason = form.cleaned_data['rejection_reason']
+                batch.save()
+                ApprovalAuditLog.objects.create(
+                    batch=batch, action='REJECTED', user=request.user,
+                    remarks=form.cleaned_data['rejection_reason'],
+                    ip_address=request.META.get('REMOTE_ADDR')
+                )
+                messages.success(request, 'Batch rejected.')
+                return redirect('authorizer_dashboard')
+    messages.error(request, 'Invalid request')
+    return redirect('review_batch', batch_id=batch_id)
+
 
 # ================ API VIEWS ================
 
@@ -2303,8 +2619,8 @@ def get_supplier_details(request, supplier_id):
         supplier = Supplier.objects.get(id=supplier_id)
         
         data = {
-            'bank_name': supplier.bank.bank_name,
-            'swift_code': supplier.bank.swift_code,
+            'bank_name': supplier.bank.bank_name if supplier.bank else '',
+            'swift_code': supplier.bank.swift_code if supplier.bank else '',
             'account_number': supplier.account_number,
             'account_name': supplier.account_name,
             'credit_reference': supplier.credit_reference or '',
@@ -2328,8 +2644,8 @@ def get_scheme_zone(request, scheme_id):
             scheme = Scheme.objects.get(scheme_code=scheme_id)
         
         data = {
-            'zone_code': scheme.zone.zone_code,
-            'zone_name': scheme.zone.zone_name,
+            'zone_code': scheme.zone.zone_code if scheme.zone else '',
+            'zone_name': scheme.zone.zone_name if scheme.zone else '',
         }
         return JsonResponse(data)
     except Scheme.DoesNotExist:
@@ -2352,8 +2668,8 @@ def get_scheme_details(request, scheme_id):
         
         data = {
             'success': True,
-            'zone_code': scheme.zone.zone_code,
-            'zone_name': scheme.zone.zone_name,
+            'zone_code': scheme.zone.zone_code if scheme.zone else '',
+            'zone_name': scheme.zone.zone_name if scheme.zone else '',
             'default_cost_center': scheme.default_cost_center or '',
             'scheme_code': scheme.scheme_code,
             'scheme_name': scheme.scheme_name,

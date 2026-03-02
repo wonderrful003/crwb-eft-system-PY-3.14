@@ -2,7 +2,6 @@
 {% extends 'base.html' %}
 
 {% block title %}Create EFT Batch - CRWB EFT{% endblock %}
-
 {% block page_title %}Create New EFT Batch{% endblock %}
 
 {% block breadcrumbs %}
@@ -31,57 +30,241 @@
 </li>
 {% endblock %}
 
+{% block page_css %}
+<style>
+/* ---- Workflow tracker (same design language as view_batch) ---- */
+.workflow-tracker {
+    background: #fff;
+    border: 1px solid #e0e4ea;
+    border-radius: 14px;
+    padding: 1.75rem 2rem 1.5rem;
+    margin-bottom: 1.75rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.055);
+}
+.workflow-tracker-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: #9aa0ac;
+    margin-bottom: 1.5rem;
+}
+.wf-track {
+    display: flex;
+    align-items: flex-start;
+    position: relative;
+}
+.wf-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+}
+.wf-connector {
+    flex: 1;
+    height: 3px;
+    margin-top: 19px;
+    border-radius: 99px;
+    background: #e0e4ea;
+    position: relative;
+    z-index: 0;
+}
+.wf-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 700;
+    border: 3px solid #e0e4ea;
+    background: #f4f6f9;
+    color: #b0b8c4;
+    flex-shrink: 0;
+}
+/* active = you are here */
+.wf-step.wf-active .wf-circle {
+    border-color: #0d6efd;
+    background: #0d6efd;
+    color: #fff;
+    box-shadow: 0 0 0 5px rgba(13,110,253,.15);
+    animation: wf-pulse 1.8s infinite;
+}
+/* waiting = future steps */
+.wf-step.wf-waiting .wf-circle {
+    border-color: #e0e4ea;
+    background: #f4f6f9;
+    color: #b0b8c4;
+}
+@keyframes wf-pulse {
+    0%   { box-shadow: 0 0 0 0   rgba(13,110,253,.45); }
+    60%  { box-shadow: 0 0 0 11px rgba(13,110,253,0);  }
+    100% { box-shadow: 0 0 0 0   rgba(13,110,253,0);   }
+}
+.wf-label {
+    margin-top: 0.65rem;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #b0b8c4;
+    line-height: 1.3;
+    max-width: 80px;
+}
+.wf-step.wf-active .wf-label { color: #0d6efd; }
+.wf-sublabel {
+    font-size: 0.67rem;
+    font-weight: 400;
+    margin-top: 2px;
+    color: #0d6efd;
+    opacity: 0.85;
+}
+
+/* ---- What happens next list ---- */
+.wf-steps-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.wf-steps-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid #f1f3f5;
+    font-size: 0.875rem;
+    color: #495057;
+}
+.wf-steps-list li:last-child { border-bottom: none; }
+.wf-steps-list .step-num {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.step-num.current { background: #0d6efd; color: #fff; }
+.step-num.future  { background: #e9ecef; color: #6c757d; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8 col-xl-6">
-        <!-- Instructions Card -->
-        <div class="dashboard-card mb-4">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0">
-                    <i class="fas fa-info-circle"></i> Getting Started
-                </h5>
+    <div class="col-lg-8 col-xl-7">
+
+        <!-- ================================================================
+             WORKFLOW TRACKER — "You are here" at step 1
+             ================================================================ -->
+        <div class="workflow-tracker">
+            <div class="workflow-tracker-title">
+                <i class="fas fa-route me-1"></i> Approval Workflow — where you are
             </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-4 text-center">
-                        <div class="mb-2">
-                            <i class="fas fa-file-alt fa-2x text-info"></i>
-                        </div>
-                        <strong>Step 1</strong>
-                        <p class="small mb-0">Create batch with a descriptive name</p>
-                    </div>
-                    <div class="col-md-4 text-center">
-                        <div class="mb-2">
-                            <i class="fas fa-plus-circle fa-2x text-warning"></i>
-                        </div>
-                        <strong>Step 2</strong>
-                        <p class="small mb-0">Add transactions to the batch</p>
-                    </div>
-                    <div class="col-md-4 text-center">
-                        <div class="mb-2">
-                            <i class="fas fa-paper-plane fa-2x text-success"></i>
-                        </div>
-                        <strong>Step 3</strong>
-                        <p class="small mb-0">Submit for approval</p>
+
+            <div class="wf-track">
+
+                <!-- 1. Create — ACTIVE (you are here) -->
+                <div class="wf-step wf-active">
+                    <div class="wf-circle"><i class="fas fa-pen"></i></div>
+                    <div class="wf-label">Create Batch
+                        <div class="wf-sublabel">← You</div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Create Batch Form -->
+                <div class="wf-connector"></div>
+
+                <!-- 2. Add transactions -->
+                <div class="wf-step wf-waiting">
+                    <div class="wf-circle"><i class="fas fa-plus"></i></div>
+                    <div class="wf-label">Add Transactions</div>
+                </div>
+
+                <div class="wf-connector"></div>
+
+                <!-- 3. Submit -->
+                <div class="wf-step wf-waiting">
+                    <div class="wf-circle"><i class="fas fa-paper-plane"></i></div>
+                    <div class="wf-label">Submit to FM</div>
+                </div>
+
+                <div class="wf-connector"></div>
+
+                <!-- 4. Finance Manager -->
+                <div class="wf-step wf-waiting">
+                    <div class="wf-circle"><i class="fas fa-user-tie"></i></div>
+                    <div class="wf-label">Finance Manager Review</div>
+                </div>
+
+                <div class="wf-connector"></div>
+
+                <!-- 5. Director -->
+                <div class="wf-step wf-waiting">
+                    <div class="wf-circle"><i class="fas fa-crown"></i></div>
+                    <div class="wf-label">Director Approval</div>
+                </div>
+
+                <div class="wf-connector"></div>
+
+                <!-- 6. Export -->
+                <div class="wf-step wf-waiting">
+                    <div class="wf-circle"><i class="fas fa-file-export"></i></div>
+                    <div class="wf-label">Export to RBM</div>
+                </div>
+
+            </div><!-- /wf-track -->
+
+            <!-- Step descriptions below tracker -->
+            <div class="mt-4 pt-3 border-top">
+                <ul class="wf-steps-list">
+                    <li>
+                        <div class="step-num current">1</div>
+                        <div><strong>Create the batch</strong> — give it a clear descriptive name (you are here)</div>
+                    </li>
+                    <li>
+                        <div class="step-num future">2</div>
+                        <div><strong>Add transactions</strong> — each line maps to one RBM payment</div>
+                    </li>
+                    <li>
+                        <div class="step-num future">3</div>
+                        <div><strong>Submit for approval</strong> — batch goes to the Finance Manager for Stage 1 review</div>
+                    </li>
+                    <li>
+                        <div class="step-num future">4</div>
+                        <div><strong>Finance Manager reviews</strong> — verifies transactions and forwards to Director, or rejects</div>
+                    </li>
+                    <li>
+                        <div class="step-num future">5</div>
+                        <div><strong>Director of Finance</strong> — gives final approval or rejects</div>
+                    </li>
+                    <li>
+                        <div class="step-num future">6</div>
+                        <div><strong>Export</strong> — download the approved EFT file and submit to RBM</div>
+                    </li>
+                </ul>
+            </div>
+
+        </div><!-- /workflow-tracker -->
+
+
+        <!-- ================================================================
+             FORM
+             ================================================================ -->
         <div class="dashboard-card">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">
-                    <i class="fas fa-file-invoice"></i> New EFT Batch Details
+                    <i class="fas fa-file-invoice me-2"></i>New EFT Batch Details
                 </h5>
             </div>
             <div class="card-body p-4">
                 <form method="post">
                     {% csrf_token %}
-                    
+
                     <div class="mb-4">
-                        <label for="{{ form.batch_name.id_for_label }}" class="form-label">
-                            <i class="fas fa-tag text-primary"></i> Batch Name 
+                        <label for="{{ form.batch_name.id_for_label }}" class="form-label fw-semibold">
+                            <i class="fas fa-tag text-primary"></i> Batch Name
                             <span class="text-danger">*</span>
                         </label>
                         {{ form.batch_name }}
@@ -97,26 +280,11 @@
                         {% endif %}
                     </div>
 
-                    <div class="alert alert-light border">
-                        <div class="d-flex align-items-start">
-                            <i class="fas fa-info-circle text-info fa-2x me-3"></i>
-                            <div>
-                                <h6 class="alert-heading">What happens next?</h6>
-                                <ul class="mb-0 ps-3">
-                                    <li>After creating the batch, you'll be redirected to add transactions</li>
-                                    <li>You can add multiple transactions to the batch</li>
-                                    <li>Review all transactions before submitting for approval</li>
-                                    <li>Once submitted, the batch will await authorizer approval</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                         <a href="{% url 'accounts_dashboard' %}" class="btn btn-outline-secondary">
                             <i class="fas fa-arrow-left"></i> Cancel
                         </a>
-                        <button type="submit" class="btn btn-primary px-4">
+                        <button type="submit" class="btn btn-primary px-4" id="createBtn">
                             <i class="fas fa-check-circle"></i> Create Batch
                         </button>
                     </div>
@@ -124,34 +292,27 @@
             </div>
         </div>
 
-        <!-- Tips Card -->
+
+        <!-- ================================================================
+             BEST PRACTICES
+             ================================================================ -->
         <div class="dashboard-card mt-4">
             <div class="card-header bg-light">
                 <h5 class="mb-0">
                     <i class="fas fa-lightbulb text-warning"></i> Best Practices
                 </h5>
             </div>
-            <div class="card-body">
-                <ul class="mb-0">
-                    <li class="mb-2">
-                        <i class="fas fa-check text-success"></i>
-                        Use clear, descriptive names that identify the purpose and period
-                    </li>
-                    <li class="mb-2">
-                        <i class="fas fa-check text-success"></i>
-                        Include the month/quarter/year in the batch name
-                    </li>
-                    <li class="mb-2">
-                        <i class="fas fa-check text-success"></i>
-                        Group related transactions in a single batch
-                    </li>
-                    <li class="mb-0">
-                        <i class="fas fa-check text-success"></i>
-                        Avoid creating duplicate batches for the same payments
-                    </li>
+            <div class="card-body p-3">
+                <ul class="mb-0" style="font-size:0.9rem;">
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Use clear, descriptive names that identify the purpose and period</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Include the month/quarter/year in the batch name</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Group related transactions in a single batch</li>
+                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Double-check IFMIS source references before submitting</li>
+                    <li class="mb-0"><i class="fas fa-check text-success me-2"></i>Avoid creating duplicate batches for the same payments</li>
                 </ul>
             </div>
         </div>
+
     </div>
 </div>
 {% endblock %}
@@ -159,14 +320,10 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
-    // Auto-focus on batch name field
     $('#{{ form.batch_name.id_for_label }}').focus();
-    
-    // Form validation feedback
     $('form').on('submit', function() {
-        const submitBtn = $(this).find('button[type="submit"]');
-        submitBtn.prop('disabled', true);
-        submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Creating...');
+        const btn = $('#createBtn');
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Creating…');
     });
 });
 </script>
