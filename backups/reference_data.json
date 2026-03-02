@@ -1,639 +1,684 @@
-[
-{
-  "model": "eft_app.bank",
-  "pk": 1,
-  "fields": {
-    "bank_name": "National Bank of Malawi",
-    "swift_code": "NBMAMWMW",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-01-19T08:25:01.841Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 2,
-  "fields": {
-    "bank_name": "Standard Bank PLC",
-    "swift_code": "SBICMWMX",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-01-19T08:25:02.038Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 3,
-  "fields": {
-    "bank_name": "Reserve Bank of Malawi",
-    "swift_code": "RBMAMWMW",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-01-19T08:25:02.221Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 4,
-  "fields": {
-    "bank_name": "FDH Bank PLC",
-    "swift_code": "FDHFMWMW",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-01-19T08:25:02.421Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 5,
-  "fields": {
-    "bank_name": "NBS Bank PLC",
-    "swift_code": "NBSTMWMW",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-01-19T08:25:02.680Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 6,
-  "fields": {
-    "bank_name": "wonder",
-    "swift_code": "WNTMWM12344",
-    "is_active": false,
-    "created_by": 3,
-    "created_at": "2026-01-27T12:02:07.455Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 7,
-  "fields": {
-    "bank_name": "Centenary Bank Limited",
-    "swift_code": "MBBCMWMW",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-02-09T11:07:50Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 8,
-  "fields": {
-    "bank_name": "First Capital Bank PLC",
-    "swift_code": "FRCGMWMW",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-02-09T11:07:50Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 9,
-  "fields": {
-    "bank_name": "Ecobank Malawi Limited",
-    "swift_code": "ECOCMWMW",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-02-09T11:07:50Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 10,
-  "fields": {
-    "bank_name": "CDH Investment Bank",
-    "swift_code": "CDHIMWMW",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-02-09T11:07:50Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 11,
-  "fields": {
-    "bank_name": "MyBucks Banking Corporation",
-    "swift_code": "NFBMMWMW",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-02-09T11:07:50Z"
-  }
-},
-{
-  "model": "eft_app.bank",
-  "pk": 12,
-  "fields": {
-    "bank_name": "First Discount House Limited",
-    "swift_code": "FDHDMWMW",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-02-09T11:07:50Z"
-  }
-},
-{
-  "model": "eft_app.zone",
-  "pk": 1,
-  "fields": {
-    "zone_code": "HQ_ADMIN",
-    "zone_name": "Headquarters (Lilongwe)",
-    "description": "",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:00.184Z"
-  }
-},
-{
-  "model": "eft_app.zone",
-  "pk": 2,
-  "fields": {
-    "zone_code": "KS_ZONE",
-    "zone_name": "Kasungu Zone",
-    "description": "",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:00.347Z"
-  }
-},
-{
-  "model": "eft_app.zone",
-  "pk": 3,
-  "fields": {
-    "zone_code": "MP_ZONE",
-    "zone_name": "Mponela Zone",
-    "description": "",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:00.504Z"
-  }
-},
-{
-  "model": "eft_app.zone",
-  "pk": 4,
-  "fields": {
-    "zone_code": "SL_ZONE",
-    "zone_name": "Salima Zone",
-    "description": "",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:00.657Z"
-  }
-},
-{
-  "model": "eft_app.zone",
-  "pk": 5,
-  "fields": {
-    "zone_code": "DZ_ZONE",
-    "zone_name": "Dedza Zone",
-    "description": "",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:00.805Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 1,
-  "fields": {
-    "scheme_code": "03000101",
-    "scheme_name": "HQ Administration",
-    "zone": 1,
-    "default_cost_center": "03000101",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:00.947Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 2,
-  "fields": {
-    "scheme_code": "10019525",
-    "scheme_name": "Mponela Main Scheme",
-    "zone": 3,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:01.114Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 3,
-  "fields": {
-    "scheme_code": "10019524",
-    "scheme_name": "Salima Town Scheme",
-    "zone": 4,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:01.305Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 4,
-  "fields": {
-    "scheme_code": "10019523",
-    "scheme_name": "Dedza Boma Scheme",
-    "zone": 5,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:01.456Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 5,
-  "fields": {
-    "scheme_code": "10019530",
-    "scheme_name": "Kasungu Boma Scheme",
-    "zone": 2,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:01.700Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 6,
-  "fields": {
-    "scheme_code": "SALIMA_01",
-    "scheme_name": "Salima",
-    "zone": 4,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 7,
-  "fields": {
-    "scheme_code": "SALIMA_02",
-    "scheme_name": "Salima Lakeshore",
-    "zone": 4,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 8,
-  "fields": {
-    "scheme_code": "SALIMA_03",
-    "scheme_name": "Nkhotakota",
-    "zone": 4,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 9,
-  "fields": {
-    "scheme_code": "SALIMA_04",
-    "scheme_name": "Chipoka",
-    "zone": 4,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 10,
-  "fields": {
-    "scheme_code": "SALIMA_05",
-    "scheme_name": "Dwangwa",
-    "zone": 4,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 11,
-  "fields": {
-    "scheme_code": "DEDZA_01",
-    "scheme_name": "Dedza",
-    "zone": 5,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 12,
-  "fields": {
-    "scheme_code": "DEDZA_02",
-    "scheme_name": "Ntcheu",
-    "zone": 5,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 13,
-  "fields": {
-    "scheme_code": "DEDZA_03",
-    "scheme_name": "Bunda/Mitundu",
-    "zone": 5,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 14,
-  "fields": {
-    "scheme_code": "DEDZA_04",
-    "scheme_name": "Bembeke",
-    "zone": 5,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 15,
-  "fields": {
-    "scheme_code": "KASUNGU_01",
-    "scheme_name": "Kasungu",
-    "zone": 2,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 16,
-  "fields": {
-    "scheme_code": "KASUNGU_02",
-    "scheme_name": "Mchinji",
-    "zone": 2,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 17,
-  "fields": {
-    "scheme_code": "KASUNGU_03",
-    "scheme_name": "Kochilira-Kamwendo",
-    "zone": 2,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 18,
-  "fields": {
-    "scheme_code": "KASUNGU_04",
-    "scheme_name": "Santhe",
-    "zone": 2,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 19,
-  "fields": {
-    "scheme_code": "KASUNGU_05",
-    "scheme_name": "Mkanda",
-    "zone": 2,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 20,
-  "fields": {
-    "scheme_code": "KASUNGU_06",
-    "scheme_name": "Kamwendo",
-    "zone": 2,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 21,
-  "fields": {
-    "scheme_code": "KASUNGU_07",
-    "scheme_name": "Mchinji Border",
-    "zone": 2,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 22,
-  "fields": {
-    "scheme_code": "MPONELA_01",
-    "scheme_name": "Mponela",
-    "zone": 3,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 23,
-  "fields": {
-    "scheme_code": "MPONELA_02",
-    "scheme_name": "Madisi",
-    "zone": 3,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 24,
-  "fields": {
-    "scheme_code": "MPONELA_03",
-    "scheme_name": "Ntchisi",
-    "zone": 3,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.scheme",
-  "pk": 25,
-  "fields": {
-    "scheme_code": "MPONELA_04",
-    "scheme_name": "Dowa",
-    "zone": 3,
-    "default_cost_center": "",
-    "is_active": true,
-    "created_at": "2026-02-09T11:10:15Z"
-  }
-},
-{
-  "model": "eft_app.supplier",
-  "pk": 1,
-  "fields": {
-    "supplier_code": "57819",
-    "supplier_name": "Bella Enterprise Pvt Ltd",
-    "bank": 1,
-    "account_number": "2004004560001",
-    "account_name": "Bella Enterprise Main",
-    "employee_number": "",
-    "national_id": "",
-    "credit_reference": "",
-    "cost_center": "",
-    "source": "",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-01-19T08:32:11.427Z"
-  }
-},
-{
-  "model": "eft_app.supplier",
-  "pk": 2,
-  "fields": {
-    "supplier_code": "3",
-    "supplier_name": "Anderson",
-    "bank": 2,
-    "account_number": "91000004",
-    "account_name": "Anderson Trading",
-    "employee_number": "",
-    "national_id": "",
-    "credit_reference": "",
-    "cost_center": "",
-    "source": "",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-01-19T08:32:11.585Z"
-  }
-},
-{
-  "model": "eft_app.supplier",
-  "pk": 3,
-  "fields": {
-    "supplier_code": "408",
-    "supplier_name": "CCSECUR",
-    "bank": 2,
-    "account_number": "12345612",
-    "account_name": "City Center Security",
-    "employee_number": "",
-    "national_id": "",
-    "credit_reference": "",
-    "cost_center": "",
-    "source": "",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-01-19T08:32:11.743Z"
-  }
-},
-{
-  "model": "eft_app.supplier",
-  "pk": 4,
-  "fields": {
-    "supplier_code": "391",
-    "supplier_name": "JIBSSEC",
-    "bank": 2,
-    "account_number": "12345678",
-    "account_name": "Jibs Security Services",
-    "employee_number": "",
-    "national_id": "",
-    "credit_reference": "",
-    "cost_center": "",
-    "source": "",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-01-19T08:32:11.885Z"
-  }
-},
-{
-  "model": "eft_app.supplier",
-  "pk": 5,
-  "fields": {
-    "supplier_code": "392",
-    "supplier_name": "EASYACC",
-    "bank": 2,
-    "account_number": "12345698",
-    "account_name": "Easy Access Solutions",
-    "employee_number": "",
-    "national_id": "",
-    "credit_reference": "",
-    "cost_center": "",
-    "source": "",
-    "is_active": true,
-    "created_by": 1,
-    "created_at": "2026-01-19T08:32:12.118Z"
-  }
-},
-{
-  "model": "eft_app.debitaccount",
-  "pk": 1,
-  "fields": {
-    "account_number": "13006161244",
-    "account_name": "(ORT) MG Other Recurrent Expenditure A/C",
-    "description": "CRWB (ORT) MG Other Recurrent Expenditure A/C",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:02.864Z"
-  }
-},
-{
-  "model": "eft_app.debitaccount",
-  "pk": 2,
-  "fields": {
-    "account_number": "13006161245",
-    "account_name": "(ORT) MG Capital Expenditure A/C",
-    "description": "CRWB (ORT) MG Capital Expenditure A/C",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:02.997Z"
-  }
-},
-{
-  "model": "eft_app.debitaccount",
-  "pk": 3,
-  "fields": {
-    "account_number": "13006161246",
-    "account_name": "(ORT) MG Salaries A/C",
-    "description": "CRWB (ORT) MG Salaries A/C",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:03.155Z"
-  }
-},
-{
-  "model": "eft_app.debitaccount",
-  "pk": 4,
-  "fields": {
-    "account_number": "13006161247",
-    "account_name": "(ORT) MG Project Funds A/C",
-    "description": "CRWB (ORT) MG Project Funds A/C",
-    "is_active": true,
-    "created_at": "2026-01-19T08:25:03.347Z"
-  }
-},
-{
-  "model": "eft_app.debitaccount",
-  "pk": 5,
-  "fields": {
-    "account_number": "34456699805",
-    "account_name": "TEST",
-    "description": "",
-    "is_active": true,
-    "created_at": "2026-01-23T06:48:47.950Z"
-  }
+Here's the updated documentation with instructions for flushing the database to load the new structure:
+
+# 🏦 CRWB EFT Payment Processing System
+
+**Electronic Funds Transfer System for Central Region Water Board, Malawi**
+
+---
+
+## 📋 Table of Contents
+- [Overview](#overview)
+- [Features](#features) 
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Database Setup](#database-setup)
+- [Configuration](#configuration)
+- [Running the Application](#running-the-application)
+- [Database Flush & Reset](#database-flush--reset)
+- [Sample Data](#sample-data)
+- [Project Structure](#project-structure)
+- [RBM Compliance](#rbm-compliance)
+- [Troubleshooting](#troubleshooting)
+- [Support](#support)
+
+---
+
+## 📖 Overview
+
+The CRWB EFT System is a web-based payment processing application designed specifically for Central Region Water Board, Malawi. It facilitates electronic funds transfer operations while ensuring full compliance with Reserve Bank of Malawi (RBM) specifications.
+
+---
+
+## ✨ Features
+
+### 🏢 Master Data Management
+- **Banks**: Manage financial institutions with SWIFT codes
+- **Zones**: CRWB operational zones
+- **Schemes**: Water schemes with auto-cost center assignment
+- **Suppliers**: Beneficiary/vendor management
+- **Debit Accounts**: CRWB bank accounts
+
+### 👥 User Management
+- **System Administrators**: Full system access and configuration
+- **Accounts Personnel**: Batch creation and transaction management
+- **Finance Manager**: Stage 1 approval (review)
+- **Director of Finance**: Final approval
+
+### 🔄 Workflow Management
+- Batch creation and editing
+- Transaction addition/removal
+- Two-stage approval workflow
+- Complete audit trail
+
+### 📊 RBM Compliance
+- Automatic RBM file format generation
+- Validation of all required fields
+- Text file export in RBM-compatible format
+- Real-time compliance checking
+
+---
+
+## 🛠 Tech Stack
+
+### Backend
+- **Python 3.14+**
+- **Django 5.0.6**
+- **MySQL 8.0+** (Production)
+- **SQLite** (Development - optional)
+
+### Frontend
+- **Bootstrap 5**
+- **jQuery 3.6**
+- **Font Awesome 6**
+
+### Key Dependencies
+- `mysqlclient`: MySQL database connector
+- `django-crispy-forms`: Form rendering
+- `openpyxl`: Excel file generation
+- `xlwt`: Excel export functionality
+- `Pillow`: Image processing
+
+---
+
+## 📋 Prerequisites
+
+### Software Requirements
+- Python 3.14 or higher
+- MySQL 8.0 or higher
+- Git
+- pip (Python package manager)
+
+### Windows Specific
+- MySQL Installer for Windows
+- Visual C++ Redistributable (for mysqlclient)
+
+---
+
+## 🚀 Installation
+
+### Step 1: Clone Repository
+```bash
+git clone https://github.com/wonderrful003/crwb-eft-system-PY-3.14.git
+cd crwb-eft-system
+```
+
+### Step 2: Create Virtual Environment
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# Linux/Mac
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### Step 3: Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+**Requirements.txt:**
+```
+Django==5.0.6
+mysqlclient==2.2.4
+django-crispy-forms==2.1
+crispy-bootstrap5==2024.1
+Pillow==10.3.0
+python-dotenv==1.0.0
+openpyxl==3.1.2
+xlwt==1.3.0
+reportlab==4.1.0
+asgiref==3.7.2
+sqlparse==0.4.4
+tzdata==2024.1
+```
+
+---
+
+## 🗄️ Database Setup
+
+### MySQL Installation (Windows)
+
+1. Download MySQL Installer: https://dev.mysql.com/downloads/installer/
+2. Run installer and choose "Developer Default"
+3. Set root password during installation
+4. Complete installation and start MySQL service
+
+### Create Database
+
+```sql
+-- Connect to MySQL as root
+mysql -u root -p
+
+-- Create database (MUST match settings.py)
+CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Create database user (MUST match settings.py)
+CREATE USER 'root'@'localhost' IDENTIFIED BY 'your_password';
+
+-- Grant privileges
+GRANT ALL PRIVILEGES ON crwb_eft_system.* TO 'root'@'localhost';
+FLUSH PRIVILEGES;
+
+-- Verify
+SHOW DATABASES;
+EXIT;
+```
+
+**IMPORTANT**: Database name must exactly match your `settings.py` configuration.
+
+---
+
+## ⚙️ Configuration
+
+### Step 1: Copy Environment Template
+```bash
+# Windows
+copy .env.example .env
+
+# Linux/Mac
+cp .env.example .env
+```
+
+### Step 2: Edit .env File
+
+Open `.env` and configure:
+
+```env
+# Django Settings
+SECRET_KEY=django-insecure-your-secret-key-here-change-this
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# MySQL Configuration (MUST match your MySQL setup)
+DB_NAME=crwb_eft_system
+DB_USER=root
+DB_PASSWORD=your_password_here  # Change this
+DB_HOST=localhost
+DB_PORT=3306
+
+# Optional: Email Configuration
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+```
+
+### Step 3: Verify Database Configuration
+
+Ensure `eft_system/settings.py` matches:
+
+```python
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.getenv('DB_NAME', 'crwb_eft_system'),
+        'USER': os.getenv('DB_USER', 'root'),
+        'PASSWORD': os.getenv('DB_PASSWORD', ''),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '3306'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
+    }
 }
-]
+```
+
+---
+
+## 🏃 Running the Application
+
+### Step 1: Apply Database Migrations
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+### Step 2: Create Superuser
+```bash
+python manage.py createsuperuser
+# Follow prompts to create admin account
+```
+
+### Step 3: Load Sample Data (Optional)
+```bash
+python manage.py loaddata eft_config_data.json
+```
+
+### Step 4: Start Development Server
+```bash
+python manage.py runserver
+```
+
+### Step 5: Access Application
+1. Open browser: http://localhost:8000
+2. Login with superuser credentials
+3. Navigate to different modules
+
+---
+
+## 💾 Database Flush & Reset
+
+When making significant changes to the database structure or when you need a clean slate, use these commands to flush and reset your database.
+
+### ⚠️ **WARNING: These commands will DELETE ALL DATA in your database!**
+
+### Option 1: Complete Database Reset (Recommended)
+
+```bash
+# Step 1: Drop and recreate the database
+mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# Step 2: Remove all migration files (except __init__.py)
+# Windows PowerShell
+Remove-Item eft_app/migrations/0*.py
+Remove-Item eft_app/migrations/__pycache__/* -Recurse -Force
+
+# Linux/Mac
+rm -f eft_app/migrations/0*.py
+rm -rf eft_app/migrations/__pycache__
+
+# Step 3: Create fresh migrations
+python manage.py makemigrations eft_app
+
+# Step 4: Apply migrations
+python manage.py migrate
+
+# Step 5: Create new superuser
+python manage.py createsuperuser
+
+# Step 6: Load sample data (optional)
+python manage.py loaddata eft_config_data.json
+```
+
+### Option 2: Using Django's Flush Command (Keeps Table Structure)
+
+```bash
+# This clears all data but keeps tables
+python manage.py flush
+
+# Then reload sample data
+python manage.py loaddata eft_config_data.json
+```
+
+### Option 3: Reset Specific App
+
+```bash
+# Reset only the eft_app
+python manage.py migrate eft_app zero
+python manage.py makemigrations eft_app
+python manage.py migrate eft_app
+```
+
+### Option 4: Full Reset Script (Windows PowerShell)
+
+Create a file named `reset_db.ps1`:
+
+```powershell
+# reset_db.ps1
+Write-Host "⚠️  WARNING: This will DELETE ALL DATA in the database!" -ForegroundColor Red
+$confirmation = Read-Host "Are you sure you want to continue? (y/N)"
+
+if ($confirmation -eq 'y') {
+    Write-Host "🔄 Dropping and recreating database..." -ForegroundColor Yellow
+    mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    
+    Write-Host "🔄 Removing migration files..." -ForegroundColor Yellow
+    Remove-Item eft_app/migrations/0*.py -ErrorAction SilentlyContinue
+    Remove-Item eft_app/migrations/__pycache__/* -Recurse -Force -ErrorAction SilentlyContinue
+    
+    Write-Host "🔄 Creating fresh migrations..." -ForegroundColor Yellow
+    python manage.py makemigrations eft_app
+    
+    Write-Host "🔄 Applying migrations..." -ForegroundColor Yellow
+    python manage.py migrate
+    
+    Write-Host "✅ Database reset complete!" -ForegroundColor Green
+    Write-Host "👉 Next step: Run 'python manage.py createsuperuser' to create an admin account" -ForegroundColor Cyan
+} else {
+    Write-Host "❌ Operation cancelled" -ForegroundColor Red
+}
+```
+
+### Option 5: Full Reset Script (Linux/Mac Bash)
+
+Create a file named `reset_db.sh`:
+
+```bash
+#!/bin/bash
+# reset_db.sh
+
+echo -e "\e[31m⚠️  WARNING: This will DELETE ALL DATA in the database!\e[0m"
+read -p "Are you sure you want to continue? (y/N) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]
+then
+    echo -e "\e[33m🔄 Dropping and recreating database...\e[0m"
+    mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    
+    echo -e "\e[33m🔄 Removing migration files...\e[0m"
+    rm -f eft_app/migrations/0*.py
+    rm -rf eft_app/migrations/__pycache__
+    
+    echo -e "\e[33m🔄 Creating fresh migrations...\e[0m"
+    python manage.py makemigrations eft_app
+    
+    echo -e "\e[33m🔄 Applying migrations...\e[0m"
+    python manage.py migrate
+    
+    echo -e "\e[32m✅ Database reset complete!\e[0m"
+    echo -e "\e[36m👉 Next step: Run 'python manage.py createsuperuser' to create an admin account\e[0m"
+else
+    echo -e "\e[31m❌ Operation cancelled\e[0m"
+fi
+```
+
+Make the script executable:
+```bash
+chmod +x reset_db.sh
+./reset_db.sh
+```
+
+### Option 6: Using Django Shell to Flush with Custom Logic
+
+```python
+# flush_with_audit.py
+from django.core.management import call_command
+from django.db import connection
+import os
+
+def reset_database():
+    """Reset database with audit logging"""
+    print("⚠️  WARNING: This will delete all data!")
+    confirm = input("Type 'RESET' to confirm: ")
+    
+    if confirm == "RESET":
+        # Flush the database
+        call_command('flush', '--noinput')
+        
+        # Recreate superuser if needed
+        from django.contrib.auth.models import User
+        if not User.objects.filter(is_superuser=True).exists():
+            User.objects.create_superuser(
+                username='admin',
+                email='admin@example.com',
+                password='admin123'
+            )
+            print("✅ Superuser 'admin' created with password 'admin123'")
+        
+        print("✅ Database reset complete!")
+    else:
+        print("❌ Operation cancelled")
+
+if __name__ == "__main__":
+    reset_database()
+```
+
+Run with:
+```bash
+python manage.py shell < flush_with_audit.py
+```
+
+---
+
+## 📊 Sample Data
+
+### System will prompt you to load sample data after reset:
+
+```bash
+# After database reset, load sample configuration data
+python manage.py loaddata eft_config_data.json
+
+# If sample data file doesn't exist, you can manually load:
+python manage.py shell < create_sample_data.py
+```
+
+### Sample Data Includes:
+
+#### Banks (6)
+- National Bank of Malawi (NBMAMWMW)
+- Standard Bank PLC (SBICMWMX)
+- Reserve Bank of Malawi (RBMAMWMW)
+- FDH Bank PLC (FDHFMWMW)
+- NBS Bank PLC (NBSTMWMW)
+
+#### Zones (5)
+- HQ_ADMIN - Headquarters (Lilongwe)
+- KS_ZONE - Kasungu Zone
+- MP_ZONE - Mponela Zone
+- SL_ZONE - Salima Zone
+- DZ_ZONE - Dedza Zone
+
+#### Schemes (5)
+- 03000101 - HQ Administration
+- 10019525 - Mponela Main Scheme
+- 10019524 - Salima Town Scheme
+- 10019523 - Dedza Boma Scheme
+- 10019530 - Kasungu Boma Scheme
+
+#### Suppliers (5)
+- Bella Enterprise Pvt Ltd
+- Anderson Trading
+- City Center Security
+- Jibs Security Services
+- Easy Access Solutions
+
+#### Debit Accounts (5)
+- 13006161244 - (ORT) MG Other Recurrent Expenditure A/C
+- 13006161245 - (ORT) MG Capital Expenditure A/C
+- 13006161246 - (ORT) MG Salaries A/C
+- 13006161247 - (ORT) MG Project Funds A/C
+
+---
+
+## 📁 Project Structure
+
+```
+crwb-eft-system/
+├── eft_app/                    # Main Django application
+│   ├── migrations/            # Database migrations
+│   ├── templates/             # HTML templates
+│   │   ├── admin/             # System admin templates
+│   │   ├── accounts/          # Accounts personnel templates
+│   │   ├── finance_manager/   # Finance manager templates
+│   │   ├── director/          # Director of finance templates
+│   │   └── registration/      # Authentication templates
+│   ├── models.py              # Database models
+│   ├── views.py               # View logic
+│   ├── urls.py                # URL routing
+│   ├── forms.py               # Django forms
+│   ├── admin.py               # Django admin interface
+│   ├── eft_generator.py       # RBM file generator
+│   └── apps.py                # App configuration
+├── eft_system/                # Django project
+│   ├── settings.py            # Project settings
+│   ├── urls.py                # Root URL configuration
+│   └── wsgi.py                # WSGI configuration
+├── requirements.txt           # Python dependencies
+├── manage.py                  # Django management script
+├── eft_config_data.json       # Sample database data
+├── reset_db.ps1               # Windows reset script
+├── reset_db.sh                # Linux/Mac reset script
+├── .env.example               # Environment variables template
+├── .gitignore                 # Git ignore rules
+└── README.md                  # This documentation
+```
+
+---
+
+## 🏦 RBM Compliance
+
+### Transaction Format
+The system generates RBM-compliant EFT files with exact format:
+
+```
+1;[Sequence];MWK;[Account];[Name];[Amount];[Details1];[Details2];;;;;[BIC];[CreditAcc];;;;[Ref];[Desc]
+```
+
+### Required Fields
+1. **Record Type** (1=Detail)
+2. **Sequence Number** (4 digits, zero-padded)
+3. **Currency** (MWK)
+4. **Debit Account Number** (20 characters)
+5. **Debit Account Name** (55 characters)
+6. **Payment Amount** (2 decimal places)
+7. **Payee Details 1** (55 characters)
+8. **Payee Details 2** (7 characters, vendor code)
+9-12. **Payment Details 3-6** (Optional)
+13. **Beneficiary Bank BIC** (8 or 11 characters)
+14. **Credit Account Number** (20 characters)
+15-17. **Mandate Details** (Optional)
+18. **Originator's Reference** (18 characters, IFMIS reference)
+19. **Transaction Description** (200 characters)
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### 1. MySQL Connection Error
+**Error**: `django.db.utils.OperationalError: (2003, "Can't connect to MySQL server")`
+
+**Solution**:
+```bash
+# Check MySQL service is running
+# Windows: Open Services (services.msc) → Find MySQL80 → Start
+
+# Verify MySQL installation
+mysql --version
+
+# Test connection manually
+mysql -u root -p
+```
+
+#### 2. Database Access Denied
+**Error**: `Access denied for user 'root'@'localhost'`
+
+**Solution**:
+```sql
+-- Grant privileges again
+GRANT ALL PRIVILEGES ON crwb_eft_system.* TO 'root'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+#### 3. Missing mysqlclient
+**Error**: `mysqlclient 2.0.3 or newer is required`
+
+**Solution**:
+```bash
+# Windows: Download appropriate wheel from https://www.lfd.uci.edu/~gohlke/pythonlibs/#mysqlclient
+pip install mysqlclient-2.2.4-cp314-cp314-win_amd64.whl
+
+# Or install using pip
+pip install mysqlclient
+```
+
+#### 4. Migration Errors After Reset
+```bash
+# If migrations fail after reset, try:
+python manage.py migrate --fake-initial
+python manage.py migrate
+```
+
+#### 5. Port Already in Use
+```bash
+# Kill process on port 8000
+# Windows:
+netstat -ano | findstr :8000
+taskkill /PID [PID] /F
+
+# Linux/Mac:
+lsof -ti:8000 | xargs kill -9
+```
+
+#### 6. "No module named 'eft_app'" Error
+**Solution**:
+```bash
+# Make sure you're in the correct directory
+cd crwb-eft-system
+
+# Check Python path
+python -c "import sys; print(sys.path)"
+```
+
+#### 7. User Delete 405 Error Fix
+If you encounter "Method Not Allowed (GET)" when trying to delete users, ensure:
+- Delete links point to `/system-admin/users/[id]/delete/confirm/`
+- The actual delete URL uses POST method
+- You have the `user_delete_confirm` view defined
+
+---
+
+## 🆘 Support
+
+### Contact Information
+- **Developer**: CRWB ICT Department
+- **Email**: support@crwb.mw
+- **Phone**: +265 (0) 1 234 567
+
+### Documentation
+- Django Documentation: https://docs.djangoproject.com/
+- MySQL Documentation: https://dev.mysql.com/doc/
+- Bootstrap Documentation: https://getbootstrap.com/docs/
+
+### Issue Reporting
+1. Check existing issues on GitHub
+2. Create new issue with detailed description
+3. Include error messages and steps to reproduce
+
+---
+
+## 📄 License
+
+This software is proprietary and developed exclusively for Central Region Water Board, Malawi. Unauthorized distribution or use is prohibited.
+
+---
+
+## 📅 Version Information
+
+- **Version**: 2.0.0
+- **Release Date**: March 2026
+- **Compatibility**: Python 3.14+, Django 5.0.6, MySQL 8.0+
+- **Key Updates**: 
+  - Two-stage approval workflow (Finance Manager + Director)
+  - User delete confirmation page
+  - Enhanced audit logging
+  - RBM compliance improvements
+- **Last Updated**: March 2026
+
+---
+
+## 🔄 Quick Reset Commands Summary
+
+For quick reference, here are all reset commands in one place:
+
+### Windows PowerShell
+```powershell
+# Complete reset
+mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+Remove-Item eft_app/migrations/0*.py -ErrorAction SilentlyContinue
+python manage.py makemigrations eft_app
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+### Linux/Mac
+```bash
+# Complete reset
+mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+rm -f eft_app/migrations/0*.py
+python manage.py makemigrations eft_app
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+---
+
+**Developed for**: Central Region Water Board, Malawi  
+**Purpose**: Electronic Funds Transfer Processing System  
+**Compliance**: Reserve Bank of Malawi (RBM) Standards

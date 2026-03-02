@@ -1,4 +1,5 @@
 
+
 # 🏦 CRWB EFT Payment Processing System
 
 **Electronic Funds Transfer System for Central Region Water Board, Malawi**
@@ -15,7 +16,8 @@
 - [Configuration](#configuration)
 - [Running the Application](#running-the-application)
 - [Database Flush & Reset](#database-flush--reset)
-- [Sample Data](#sample-data)
+- [Loading Reference Data](#loading-reference-data)
+- [Sample Data Contents](#sample-data-contents)
 - [Project Structure](#project-structure)
 - [RBM Compliance](#rbm-compliance)
 - [Troubleshooting](#troubleshooting)
@@ -32,11 +34,11 @@ The CRWB EFT System is a web-based payment processing application designed speci
 ## ✨ Features
 
 ### 🏢 Master Data Management
-- **Banks**: Manage financial institutions with SWIFT codes
-- **Zones**: CRWB operational zones
-- **Schemes**: Water schemes with auto-cost center assignment
-- **Suppliers**: Beneficiary/vendor management
-- **Debit Accounts**: CRWB bank accounts
+- **Banks**: 12+ financial institutions with SWIFT codes
+- **Zones**: 5 CRWB operational zones
+- **Schemes**: 25+ water schemes with auto-cost center assignment
+- **Suppliers**: 5+ beneficiary/vendor management
+- **Debit Accounts**: 5 CRWB bank accounts
 
 ### 👥 User Management
 - **System Administrators**: Full system access and configuration
@@ -74,9 +76,12 @@ The CRWB EFT System is a web-based payment processing application designed speci
 ### Key Dependencies
 - `mysqlclient`: MySQL database connector
 - `django-crispy-forms`: Form rendering
+- `crispy-bootstrap5`: Bootstrap 5 integration
+- `Pillow`: Image processing
+- `python-dotenv`: Environment variable management
 - `openpyxl`: Excel file generation
 - `xlwt`: Excel export functionality
-- `Pillow`: Image processing
+- `reportlab`: PDF generation
 
 ---
 
@@ -243,9 +248,10 @@ python manage.py createsuperuser
 # Follow prompts to create admin account
 ```
 
-### Step 3: Load Sample Data (Optional)
+### Step 3: Load Reference Data
 ```bash
-python manage.py loaddata eft_config_data.json
+# Navigate to backup folder and load reference data
+python manage.py loaddata backup/reference_data.json
 ```
 
 ### Step 4: Start Development Server
@@ -266,7 +272,7 @@ When making significant changes to the database structure or when you need a cle
 
 ### ⚠️ **WARNING: These commands will DELETE ALL DATA in your database!**
 
-### Option 1: Complete Database Reset (Recommended)
+### Option 1: Complete Database Reset with Reference Data (Recommended)
 
 ```bash
 # Step 1: Drop and recreate the database
@@ -290,32 +296,23 @@ python manage.py migrate
 # Step 5: Create new superuser
 python manage.py createsuperuser
 
-# Step 6: Load sample data (optional)
-python manage.py loaddata eft_config_data.json
+# Step 6: Load reference data from backup folder
+python manage.py loaddata backup/reference_data.json
 ```
 
-### Option 2: Using Django's Flush Command (Keeps Table Structure)
+### Option 2: Quick Reset with Flush Command
 
 ```bash
-# This clears all data but keeps tables
+# This clears all data but keeps table structure
 python manage.py flush
 
-# Then reload sample data
-python manage.py loaddata eft_config_data.json
+# Then reload reference data
+python manage.py loaddata backup/reference_data.json
 ```
 
-### Option 3: Reset Specific App
+### Option 3: Full Reset Script (Windows PowerShell)
 
-```bash
-# Reset only the eft_app
-python manage.py migrate eft_app zero
-python manage.py makemigrations eft_app
-python manage.py migrate eft_app
-```
-
-### Option 4: Full Reset Script (Windows PowerShell)
-
-Create a file named `reset_db.ps1`:
+Create a file named `reset_db.ps1` in the project root:
 
 ```powershell
 # reset_db.ps1
@@ -336,16 +333,26 @@ if ($confirmation -eq 'y') {
     Write-Host "🔄 Applying migrations..." -ForegroundColor Yellow
     python manage.py migrate
     
-    Write-Host "✅ Database reset complete!" -ForegroundColor Green
-    Write-Host "👉 Next step: Run 'python manage.py createsuperuser' to create an admin account" -ForegroundColor Cyan
+    Write-Host "🔄 Creating superuser..." -ForegroundColor Yellow
+    python manage.py createsuperuser
+    
+    Write-Host "🔄 Loading reference data..." -ForegroundColor Yellow
+    python manage.py loaddata backup/reference_data.json
+    
+    Write-Host "✅ Database reset and data load complete!" -ForegroundColor Green
 } else {
     Write-Host "❌ Operation cancelled" -ForegroundColor Red
 }
 ```
 
-### Option 5: Full Reset Script (Linux/Mac Bash)
+Run with:
+```powershell
+.\reset_db.ps1
+```
 
-Create a file named `reset_db.sh`:
+### Option 4: Full Reset Script (Linux/Mac Bash)
+
+Create a file named `reset_db.sh` in the project root:
 
 ```bash
 #!/bin/bash
@@ -369,8 +376,13 @@ then
     echo -e "\e[33m🔄 Applying migrations...\e[0m"
     python manage.py migrate
     
-    echo -e "\e[32m✅ Database reset complete!\e[0m"
-    echo -e "\e[36m👉 Next step: Run 'python manage.py createsuperuser' to create an admin account\e[0m"
+    echo -e "\e[33m🔄 Creating superuser...\e[0m"
+    python manage.py createsuperuser
+    
+    echo -e "\e[33m🔄 Loading reference data...\e[0m"
+    python manage.py loaddata backup/reference_data.json
+    
+    echo -e "\e[32m✅ Database reset and data load complete!\e[0m"
 else
     echo -e "\e[31m❌ Operation cancelled\e[0m"
 fi
@@ -382,95 +394,125 @@ chmod +x reset_db.sh
 ./reset_db.sh
 ```
 
-### Option 6: Using Django Shell to Flush with Custom Logic
+---
+
+## 📥 Loading Reference Data
+
+### Method 1: Using Django Loaddata Command
+
+```bash
+# Navigate to project root and load the reference data
+python manage.py loaddata backup/reference_data.json
+```
+
+### Method 2: If You Get Integrity Errors
+
+If you encounter foreign key or integrity errors when loading data:
+
+```bash
+# Load in specific order to respect dependencies
+python manage.py loaddata backup/reference_data.json --ignorenonexistent
+```
+
+### Method 3: Load Data After Fresh Migration
+
+```bash
+# Complete fresh start
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py loaddata backup/reference_data.json
+```
+
+### Method 4: Using Python Shell to Load Data
+
+Create a script `load_reference_data.py`:
 
 ```python
-# flush_with_audit.py
+# load_reference_data.py
 from django.core.management import call_command
-from django.db import connection
 import os
 
-def reset_database():
-    """Reset database with audit logging"""
-    print("⚠️  WARNING: This will delete all data!")
-    confirm = input("Type 'RESET' to confirm: ")
+def load_reference_data():
+    """Load reference data from backup folder"""
+    data_file = os.path.join('backup', 'reference_data.json')
     
-    if confirm == "RESET":
-        # Flush the database
-        call_command('flush', '--noinput')
-        
-        # Recreate superuser if needed
-        from django.contrib.auth.models import User
-        if not User.objects.filter(is_superuser=True).exists():
-            User.objects.create_superuser(
-                username='admin',
-                email='admin@example.com',
-                password='admin123'
-            )
-            print("✅ Superuser 'admin' created with password 'admin123'")
-        
-        print("✅ Database reset complete!")
+    if os.path.exists(data_file):
+        print(f"Loading data from {data_file}...")
+        call_command('loaddata', data_file)
+        print("✅ Reference data loaded successfully!")
     else:
-        print("❌ Operation cancelled")
+        print(f"❌ Data file not found: {data_file}")
 
 if __name__ == "__main__":
-    reset_database()
+    load_reference_data()
 ```
 
 Run with:
 ```bash
-python manage.py shell < flush_with_audit.py
+python manage.py shell < load_reference_data.py
 ```
 
 ---
 
-## 📊 Sample Data
+## 📊 Sample Data Contents
 
-### System will prompt you to load sample data after reset:
+The `reference_data.json` file contains the following master data:
 
-```bash
-# After database reset, load sample configuration data
-python manage.py loaddata eft_config_data.json
+### Banks (12)
+| ID | Bank Name | SWIFT Code | Status |
+|----|-----------|------------|--------|
+| 1 | National Bank of Malawi | NBMAMWMW | Active |
+| 2 | Standard Bank PLC | SBICMWMX | Active |
+| 3 | Reserve Bank of Malawi | RBMAMWMW | Active |
+| 4 | FDH Bank PLC | FDHFMWMW | Active |
+| 5 | NBS Bank PLC | NBSTMWMW | Active |
+| 6 | wonder | WNTMWM12344 | Inactive |
+| 7 | Centenary Bank Limited | MBBCMWMW | Active |
+| 8 | First Capital Bank PLC | FRCGMWMW | Active |
+| 9 | Ecobank Malawi Limited | ECOCMWMW | Active |
+| 10 | CDH Investment Bank | CDHIMWMW | Active |
+| 11 | MyBucks Banking Corporation | NFBMMWMW | Active |
+| 12 | First Discount House Limited | FDHDMWMW | Active |
 
-# If sample data file doesn't exist, you can manually load:
-python manage.py shell < create_sample_data.py
-```
+### Zones (5)
+| ID | Zone Code | Zone Name |
+|----|-----------|-----------|
+| 1 | HQ_ADMIN | Headquarters (Lilongwe) |
+| 2 | KS_ZONE | Kasungu Zone |
+| 3 | MP_ZONE | Mponela Zone |
+| 4 | SL_ZONE | Salima Zone |
+| 5 | DZ_ZONE | Dedza Zone |
 
-### Sample Data Includes:
+### Schemes (25+)
+| ID | Scheme Code | Scheme Name | Zone |
+|----|-------------|-------------|------|
+| 1 | 03000101 | HQ Administration | HQ_ADMIN |
+| 2 | 10019525 | Mponela Main Scheme | MP_ZONE |
+| 3 | 10019524 | Salima Town Scheme | SL_ZONE |
+| 4 | 10019523 | Dedza Boma Scheme | DZ_ZONE |
+| 5 | 10019530 | Kasungu Boma Scheme | KS_ZONE |
+| 6-10 | SALIMA_01 to SALIMA_05 | Various Salima schemes | SL_ZONE |
+| 11-14 | DEDZA_01 to DEDZA_04 | Various Dedza schemes | DZ_ZONE |
+| 15-21 | KASUNGU_01 to KASUNGU_07 | Various Kasungu schemes | KS_ZONE |
+| 22-25 | MPONELA_01 to MPONELA_04 | Various Mponela schemes | MP_ZONE |
 
-#### Banks (6)
-- National Bank of Malawi (NBMAMWMW)
-- Standard Bank PLC (SBICMWMX)
-- Reserve Bank of Malawi (RBMAMWMW)
-- FDH Bank PLC (FDHFMWMW)
-- NBS Bank PLC (NBSTMWMW)
+### Suppliers (5)
+| ID | Supplier Code | Supplier Name | Bank |
+|----|--------------|---------------|------|
+| 1 | 57819 | Bella Enterprise Pvt Ltd | National Bank |
+| 2 | 3 | Anderson Trading | Standard Bank |
+| 3 | 408 | City Center Security | Standard Bank |
+| 4 | 391 | Jibs Security Services | Standard Bank |
+| 5 | 392 | Easy Access Solutions | Standard Bank |
 
-#### Zones (5)
-- HQ_ADMIN - Headquarters (Lilongwe)
-- KS_ZONE - Kasungu Zone
-- MP_ZONE - Mponela Zone
-- SL_ZONE - Salima Zone
-- DZ_ZONE - Dedza Zone
-
-#### Schemes (5)
-- 03000101 - HQ Administration
-- 10019525 - Mponela Main Scheme
-- 10019524 - Salima Town Scheme
-- 10019523 - Dedza Boma Scheme
-- 10019530 - Kasungu Boma Scheme
-
-#### Suppliers (5)
-- Bella Enterprise Pvt Ltd
-- Anderson Trading
-- City Center Security
-- Jibs Security Services
-- Easy Access Solutions
-
-#### Debit Accounts (5)
-- 13006161244 - (ORT) MG Other Recurrent Expenditure A/C
-- 13006161245 - (ORT) MG Capital Expenditure A/C
-- 13006161246 - (ORT) MG Salaries A/C
-- 13006161247 - (ORT) MG Project Funds A/C
+### Debit Accounts (5)
+| ID | Account Number | Account Name |
+|----|---------------|--------------|
+| 1 | 13006161244 | (ORT) MG Other Recurrent Expenditure A/C |
+| 2 | 13006161245 | (ORT) MG Capital Expenditure A/C |
+| 3 | 13006161246 | (ORT) MG Salaries A/C |
+| 4 | 13006161247 | (ORT) MG Project Funds A/C |
+| 5 | 34456699805 | TEST Account |
 
 ---
 
@@ -497,11 +539,13 @@ crwb-eft-system/
 │   ├── settings.py            # Project settings
 │   ├── urls.py                # Root URL configuration
 │   └── wsgi.py                # WSGI configuration
+├── backup/                    # Backup folder
+│   └── reference_data.json    # Master reference data
 ├── requirements.txt           # Python dependencies
 ├── manage.py                  # Django management script
-├── eft_config_data.json       # Sample database data
 ├── reset_db.ps1               # Windows reset script
 ├── reset_db.sh                # Linux/Mac reset script
+├── load_reference_data.py     # Data loading script
 ├── .env.example               # Environment variables template
 ├── .gitignore                 # Git ignore rules
 └── README.md                  # This documentation
@@ -570,42 +614,43 @@ FLUSH PRIVILEGES;
 
 **Solution**:
 ```bash
-# Windows: Download appropriate wheel from https://www.lfd.uci.edu/~gohlke/pythonlibs/#mysqlclient
+# Windows: Download appropriate wheel
 pip install mysqlclient-2.2.4-cp314-cp314-win_amd64.whl
 
 # Or install using pip
 pip install mysqlclient
 ```
 
-#### 4. Migration Errors After Reset
-```bash
-# If migrations fail after reset, try:
-python manage.py migrate --fake-initial
-python manage.py migrate
-```
+#### 4. Reference Data Loading Errors
+**Error**: `IntegrityError: Foreign key constraint failed`
 
-#### 5. Port Already in Use
-```bash
-# Kill process on port 8000
-# Windows:
-netstat -ano | findstr :8000
-taskkill /PID [PID] /F
-
-# Linux/Mac:
-lsof -ti:8000 | xargs kill -9
-```
-
-#### 6. "No module named 'eft_app'" Error
 **Solution**:
 ```bash
-# Make sure you're in the correct directory
-cd crwb-eft-system
+# Load data with --ignorenonexistent flag
+python manage.py loaddata backup/reference_data.json --ignorenonexistent
 
-# Check Python path
-python -c "import sys; print(sys.path)"
+# Or load in correct order:
+python manage.py loaddata backup/reference_data.json --natural-foreign
 ```
 
-#### 7. User Delete 405 Error Fix
+#### 5. "backup/reference_data.json" File Not Found
+**Error**: `FileNotFoundError: [Errno 2] No such file or directory: 'backup/reference_data.json'`
+
+**Solution**:
+```bash
+# Check if backup folder exists
+dir backup  # Windows
+ls -la backup/  # Linux/Mac
+
+# Create backup folder if it doesn't exist
+mkdir backup
+
+# Move reference_data.json to backup folder
+move reference_data.json backup/  # Windows
+mv reference_data.json backup/    # Linux/Mac
+```
+
+#### 6. User Delete 405 Error Fix
 If you encounter "Method Not Allowed (GET)" when trying to delete users, ensure:
 - Delete links point to `/system-admin/users/[id]/delete/confirm/`
 - The actual delete URL uses POST method
@@ -648,6 +693,7 @@ This software is proprietary and developed exclusively for Central Region Water 
   - User delete confirmation page
   - Enhanced audit logging
   - RBM compliance improvements
+  - Reference data in backup folder
 - **Last Updated**: March 2026
 
 ---
@@ -658,22 +704,29 @@ For quick reference, here are all reset commands in one place:
 
 ### Windows PowerShell
 ```powershell
-# Complete reset
+# Complete reset with data load
 mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 Remove-Item eft_app/migrations/0*.py -ErrorAction SilentlyContinue
 python manage.py makemigrations eft_app
 python manage.py migrate
 python manage.py createsuperuser
+python manage.py loaddata backup/reference_data.json
 ```
 
 ### Linux/Mac
 ```bash
-# Complete reset
+# Complete reset with data load
 mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 rm -f eft_app/migrations/0*.py
 python manage.py makemigrations eft_app
 python manage.py migrate
 python manage.py createsuperuser
+python manage.py loaddata backup/reference_data.json
+```
+
+### One-Liner for Quick Reset (after migrations)
+```bash
+python manage.py flush --noinput && python manage.py loaddata backup/reference_data.json
 ```
 
 ---
