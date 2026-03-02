@@ -14,6 +14,7 @@
 - [Database Setup](#database-setup)
 - [Configuration](#configuration)
 - [Running the Application](#running-the-application)
+- [Database Flush & Reset](#database-flush--reset)
 - [Sample Data](#sample-data)
 - [Project Structure](#project-structure)
 - [RBM Compliance](#rbm-compliance)
@@ -26,6 +27,8 @@
 
 The CRWB EFT System is a web-based payment processing application designed specifically for Central Region Water Board, Malawi. It facilitates electronic funds transfer operations while ensuring full compliance with Reserve Bank of Malawi (RBM) specifications.
 
+---
+
 ## ✨ Features
 
 ### 🏢 Master Data Management
@@ -35,22 +38,22 @@ The CRWB EFT System is a web-based payment processing application designed speci
 - **Suppliers**: Beneficiary/vendor management
 - **Debit Accounts**: CRWB bank accounts
 
-### 💼 Role-Based Access Control
+### 👥 User Management
 - **System Administrators**: Full system access and configuration
 - **Accounts Personnel**: Batch creation and transaction management
-- **Authorizers**: Approval workflow and compliance verification
+- **Finance Manager**: Stage 1 approval (review)
+- **Director of Finance**: Final approval
 
 ### 🔄 Workflow Management
 - Batch creation and editing
 - Transaction addition/removal
-- Submission for approval
-- Approval/Rejection workflow
+- Two-stage approval workflow
 - Complete audit trail
 
 ### 📊 RBM Compliance
 - Automatic RBM file format generation
 - Validation of all required fields
-- Excel export in RBM-compatible format
+- Text file export in RBM-compatible format
 - Real-time compliance checking
 
 ---
@@ -66,14 +69,13 @@ The CRWB EFT System is a web-based payment processing application designed speci
 ### Frontend
 - **Bootstrap 5**
 - **jQuery 3.6**
-- **DataTables**
 - **Font Awesome 6**
 
 ### Key Dependencies
 - `mysqlclient`: MySQL database connector
 - `django-crispy-forms`: Form rendering
 - `openpyxl`: Excel file generation
-- `reportlab`: PDF generation
+- `xlwt`: Excel export functionality
 - `Pillow`: Image processing
 
 ---
@@ -125,6 +127,7 @@ crispy-bootstrap5==2024.1
 Pillow==10.3.0
 python-dotenv==1.0.0
 openpyxl==3.1.2
+xlwt==1.3.0
 reportlab==4.1.0
 asgiref==3.7.2
 sqlparse==0.4.4
@@ -211,11 +214,11 @@ Ensure `eft_system/settings.py` matches:
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'crwb_eft_system',        # Must match DB_NAME in .env
-        'USER': 'root',                    # Must match DB_USER in .env
-        'PASSWORD': '',                    # Change this - Must match DB_PASSWORD in .env
-        'HOST': 'localhost',
-        'PORT': '3306',
+        'NAME': os.getenv('DB_NAME', 'crwb_eft_system'),
+        'USER': os.getenv('DB_USER', 'root'),
+        'PASSWORD': os.getenv('DB_PASSWORD', ''),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '3306'),
         'OPTIONS': {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
@@ -257,39 +260,213 @@ python manage.py runserver
 
 ---
 
+## 💾 Database Flush & Reset
+
+When making significant changes to the database structure or when you need a clean slate, use these commands to flush and reset your database.
+
+### ⚠️ **WARNING: These commands will DELETE ALL DATA in your database!**
+
+### Option 1: Complete Database Reset (Recommended)
+
+```bash
+# Step 1: Drop and recreate the database
+mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# Step 2: Remove all migration files (except __init__.py)
+# Windows PowerShell
+Remove-Item eft_app/migrations/0*.py
+Remove-Item eft_app/migrations/__pycache__/* -Recurse -Force
+
+# Linux/Mac
+rm -f eft_app/migrations/0*.py
+rm -rf eft_app/migrations/__pycache__
+
+# Step 3: Create fresh migrations
+python manage.py makemigrations eft_app
+
+# Step 4: Apply migrations
+python manage.py migrate
+
+# Step 5: Create new superuser
+python manage.py createsuperuser
+
+# Step 6: Load sample data (optional)
+python manage.py loaddata eft_config_data.json
+```
+
+### Option 2: Using Django's Flush Command (Keeps Table Structure)
+
+```bash
+# This clears all data but keeps tables
+python manage.py flush
+
+# Then reload sample data
+python manage.py loaddata eft_config_data.json
+```
+
+### Option 3: Reset Specific App
+
+```bash
+# Reset only the eft_app
+python manage.py migrate eft_app zero
+python manage.py makemigrations eft_app
+python manage.py migrate eft_app
+```
+
+### Option 4: Full Reset Script (Windows PowerShell)
+
+Create a file named `reset_db.ps1`:
+
+```powershell
+# reset_db.ps1
+Write-Host "⚠️  WARNING: This will DELETE ALL DATA in the database!" -ForegroundColor Red
+$confirmation = Read-Host "Are you sure you want to continue? (y/N)"
+
+if ($confirmation -eq 'y') {
+    Write-Host "🔄 Dropping and recreating database..." -ForegroundColor Yellow
+    mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    
+    Write-Host "🔄 Removing migration files..." -ForegroundColor Yellow
+    Remove-Item eft_app/migrations/0*.py -ErrorAction SilentlyContinue
+    Remove-Item eft_app/migrations/__pycache__/* -Recurse -Force -ErrorAction SilentlyContinue
+    
+    Write-Host "🔄 Creating fresh migrations..." -ForegroundColor Yellow
+    python manage.py makemigrations eft_app
+    
+    Write-Host "🔄 Applying migrations..." -ForegroundColor Yellow
+    python manage.py migrate
+    
+    Write-Host "✅ Database reset complete!" -ForegroundColor Green
+    Write-Host "👉 Next step: Run 'python manage.py createsuperuser' to create an admin account" -ForegroundColor Cyan
+} else {
+    Write-Host "❌ Operation cancelled" -ForegroundColor Red
+}
+```
+
+### Option 5: Full Reset Script (Linux/Mac Bash)
+
+Create a file named `reset_db.sh`:
+
+```bash
+#!/bin/bash
+# reset_db.sh
+
+echo -e "\e[31m⚠️  WARNING: This will DELETE ALL DATA in the database!\e[0m"
+read -p "Are you sure you want to continue? (y/N) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]
+then
+    echo -e "\e[33m🔄 Dropping and recreating database...\e[0m"
+    mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    
+    echo -e "\e[33m🔄 Removing migration files...\e[0m"
+    rm -f eft_app/migrations/0*.py
+    rm -rf eft_app/migrations/__pycache__
+    
+    echo -e "\e[33m🔄 Creating fresh migrations...\e[0m"
+    python manage.py makemigrations eft_app
+    
+    echo -e "\e[33m🔄 Applying migrations...\e[0m"
+    python manage.py migrate
+    
+    echo -e "\e[32m✅ Database reset complete!\e[0m"
+    echo -e "\e[36m👉 Next step: Run 'python manage.py createsuperuser' to create an admin account\e[0m"
+else
+    echo -e "\e[31m❌ Operation cancelled\e[0m"
+fi
+```
+
+Make the script executable:
+```bash
+chmod +x reset_db.sh
+./reset_db.sh
+```
+
+### Option 6: Using Django Shell to Flush with Custom Logic
+
+```python
+# flush_with_audit.py
+from django.core.management import call_command
+from django.db import connection
+import os
+
+def reset_database():
+    """Reset database with audit logging"""
+    print("⚠️  WARNING: This will delete all data!")
+    confirm = input("Type 'RESET' to confirm: ")
+    
+    if confirm == "RESET":
+        # Flush the database
+        call_command('flush', '--noinput')
+        
+        # Recreate superuser if needed
+        from django.contrib.auth.models import User
+        if not User.objects.filter(is_superuser=True).exists():
+            User.objects.create_superuser(
+                username='admin',
+                email='admin@example.com',
+                password='admin123'
+            )
+            print("✅ Superuser 'admin' created with password 'admin123'")
+        
+        print("✅ Database reset complete!")
+    else:
+        print("❌ Operation cancelled")
+
+if __name__ == "__main__":
+    reset_database()
+```
+
+Run with:
+```bash
+python manage.py shell < flush_with_audit.py
+```
+
+---
+
 ## 📊 Sample Data
 
-The system includes pre-loaded sample data:
+### System will prompt you to load sample data after reset:
 
-### Banks (6)
+```bash
+# After database reset, load sample configuration data
+python manage.py loaddata eft_config_data.json
+
+# If sample data file doesn't exist, you can manually load:
+python manage.py shell < create_sample_data.py
+```
+
+### Sample Data Includes:
+
+#### Banks (6)
 - National Bank of Malawi (NBMAMWMW)
 - Standard Bank PLC (SBICMWMX)
 - Reserve Bank of Malawi (RBMAMWMW)
 - FDH Bank PLC (FDHFMWMW)
 - NBS Bank PLC (NBSTMWMW)
 
-### Zones (5)
+#### Zones (5)
 - HQ_ADMIN - Headquarters (Lilongwe)
 - KS_ZONE - Kasungu Zone
 - MP_ZONE - Mponela Zone
 - SL_ZONE - Salima Zone
 - DZ_ZONE - Dedza Zone
 
-### Schemes (5)
+#### Schemes (5)
 - 03000101 - HQ Administration
 - 10019525 - Mponela Main Scheme
 - 10019524 - Salima Town Scheme
 - 10019523 - Dedza Boma Scheme
 - 10019530 - Kasungu Boma Scheme
 
-### Suppliers (5)
+#### Suppliers (5)
 - Bella Enterprise Pvt Ltd
 - Anderson Trading
 - City Center Security
 - Jibs Security Services
 - Easy Access Solutions
 
-### Debit Accounts (5)
+#### Debit Accounts (5)
 - 13006161244 - (ORT) MG Other Recurrent Expenditure A/C
 - 13006161245 - (ORT) MG Capital Expenditure A/C
 - 13006161246 - (ORT) MG Salaries A/C
@@ -304,23 +481,27 @@ crwb-eft-system/
 ├── eft_app/                    # Main Django application
 │   ├── migrations/            # Database migrations
 │   ├── templates/             # HTML templates
+│   │   ├── admin/             # System admin templates
 │   │   ├── accounts/          # Accounts personnel templates
-│   │   ├── system_admin/      # System admin templates
-│   │   ├── authorizer/        # Authorizer templates
+│   │   ├── finance_manager/   # Finance manager templates
+│   │   ├── director/          # Director of finance templates
 │   │   └── registration/      # Authentication templates
 │   ├── models.py              # Database models
-│   ├── views.py               # View logic (5000+ lines)
+│   ├── views.py               # View logic
 │   ├── urls.py                # URL routing
 │   ├── forms.py               # Django forms
 │   ├── admin.py               # Django admin interface
+│   ├── eft_generator.py       # RBM file generator
 │   └── apps.py                # App configuration
 ├── eft_system/                # Django project
-│   ├── settings.py            # Project settings (CRITICAL)
+│   ├── settings.py            # Project settings
 │   ├── urls.py                # Root URL configuration
 │   └── wsgi.py                # WSGI configuration
 ├── requirements.txt           # Python dependencies
 ├── manage.py                  # Django management script
-├── sample_data.json           # Sample database data
+├── eft_config_data.json       # Sample database data
+├── reset_db.ps1               # Windows reset script
+├── reset_db.sh                # Linux/Mac reset script
 ├── .env.example               # Environment variables template
 ├── .gitignore                 # Git ignore rules
 └── README.md                  # This documentation
@@ -352,13 +533,6 @@ The system generates RBM-compliant EFT files with exact format:
 15-17. **Mandate Details** (Optional)
 18. **Originator's Reference** (18 characters, IFMIS reference)
 19. **Transaction Description** (200 characters)
-
-### Validation Rules
-- All required fields must be populated
-- Amounts must have exactly 2 decimal places
-- SWIFT codes must be valid (8 or 11 characters)
-- Account numbers must be numeric
-- Sequence numbers must be unique per batch
 
 ---
 
@@ -396,18 +570,17 @@ FLUSH PRIVILEGES;
 
 **Solution**:
 ```bash
-# Windows: Download appropriate wheel
-pip install mysqlclient-2.2.4-cp311-cp311-win_amd64.whl
+# Windows: Download appropriate wheel from https://www.lfd.uci.edu/~gohlke/pythonlibs/#mysqlclient
+pip install mysqlclient-2.2.4-cp314-cp314-win_amd64.whl
 
-# Or install from unofficial binary
+# Or install using pip
 pip install mysqlclient
 ```
 
-#### 4. Migration Errors
+#### 4. Migration Errors After Reset
 ```bash
-# Reset migrations (development only!)
-python manage.py migrate --fake eft_app zero
-python manage.py makemigrations eft_app
+# If migrations fail after reset, try:
+python manage.py migrate --fake-initial
 python manage.py migrate
 ```
 
@@ -422,12 +595,30 @@ taskkill /PID [PID] /F
 lsof -ti:8000 | xargs kill -9
 ```
 
-### Debug Mode
-For development, ensure `DEBUG=True` in `.env` file to see detailed error messages.
+#### 6. "No module named 'eft_app'" Error
+**Solution**:
+```bash
+# Make sure you're in the correct directory
+cd crwb-eft-system
+
+# Check Python path
+python -c "import sys; print(sys.path)"
+```
+
+#### 7. User Delete 405 Error Fix
+If you encounter "Method Not Allowed (GET)" when trying to delete users, ensure:
+- Delete links point to `/system-admin/users/[id]/delete/confirm/`
+- The actual delete URL uses POST method
+- You have the `user_delete_confirm` view defined
 
 ---
 
+## 🆘 Support
 
+### Contact Information
+- **Developer**: CRWB ICT Department
+- **Email**: support@crwb.mw
+- **Phone**: +265 (0) 1 234 567
 
 ### Documentation
 - Django Documentation: https://docs.djangoproject.com/
@@ -449,15 +640,44 @@ This software is proprietary and developed exclusively for Central Region Water 
 
 ## 📅 Version Information
 
-- **Version**: 1.0.0
-- **Release Date**: February 2025
+- **Version**: 2.0.0
+- **Release Date**: March 2026
 - **Compatibility**: Python 3.14+, Django 5.0.6, MySQL 8.0+
-- **Last Updated**: February 2025
+- **Key Updates**: 
+  - Two-stage approval workflow (Finance Manager + Director)
+  - User delete confirmation page
+  - Enhanced audit logging
+  - RBM compliance improvements
+- **Last Updated**: March 2026
 
 ---
 
-**Developed by**: CRWB ICT Department  
-**For**: Central Region Water Board, Malawi  
-**Purpose**: Electronic Funds Transfer Processing System
+## 🔄 Quick Reset Commands Summary
+
+For quick reference, here are all reset commands in one place:
+
+### Windows PowerShell
+```powershell
+# Complete reset
+mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+Remove-Item eft_app/migrations/0*.py -ErrorAction SilentlyContinue
+python manage.py makemigrations eft_app
+python manage.py migrate
+python manage.py createsuperuser
 ```
 
+### Linux/Mac
+```bash
+# Complete reset
+mysql -u root -p -e "DROP DATABASE IF EXISTS crwb_eft_system; CREATE DATABASE crwb_eft_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+rm -f eft_app/migrations/0*.py
+python manage.py makemigrations eft_app
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+---
+
+**Developed for**: Central Region Water Board, Malawi  
+**Purpose**: Electronic Funds Transfer Processing System  
+**Compliance**: Reserve Bank of Malawi (RBM) Standards
