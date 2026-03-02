@@ -1,5 +1,4 @@
 
-```markdown
 # 🏦 CRWB EFT Payment Processing System
 
 **Electronic Funds Transfer System for Central Region Water Board, Malawi**
