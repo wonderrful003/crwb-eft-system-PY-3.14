@@ -1,4 +1,4 @@
-# eft_app/views.py - COMPLETE FIXED VERSION WITH AUTO-COST CENTER
+# eft_app/views.py - COMPLETE FIXED VERSION WITH ALL LIST VIEWS UPDATED
 # Updated for Django 5.0.6 and Python 3.14
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
@@ -422,11 +422,18 @@ def user_detail(request, user_id):
     
     return render(request, 'admin/user_detail.html', context)
 
+# ================ FIXED USER EDIT FUNCTION ================
 @login_required
 @user_passes_test(is_system_admin)
 def user_edit(request, user_id):
-    """Edit existing user"""
+    """Edit existing user - FIXED VERSION with roles from database"""
     user_obj = get_object_or_404(User, id=user_id)
+    
+    # Get all available roles from the Group model
+    all_roles = Group.objects.values_list('name', flat=True).order_by('name')
+    
+    # Get current role for the user
+    current_role = user_obj.groups.first().name if user_obj.groups.exists() else ''
     
     if request.method == 'POST':
         form = UserEditForm(request.POST, instance=user_obj)
@@ -439,14 +446,22 @@ def user_edit(request, user_id):
                     user.groups.clear()
                     group = Group.objects.get(name=role)
                     user.groups.add(group)
+                    user.is_staff = (role == 'System Admin')
+                    user.save()
                 
                 messages.success(request, f'User "{user.username}" updated successfully')
                 return redirect('user_list')
     else:
-        initial_data = {'role': user_obj.groups.first().name if user_obj.groups.exists() else ''}
+        # Initialize form with current instance
+        initial_data = {'role': current_role}
         form = UserEditForm(instance=user_obj, initial=initial_data)
     
-    return render(request, 'admin/user_edit.html', {'form': form, 'user_obj': user_obj})
+    return render(request, 'admin/user_edit.html', {
+        'form': form,
+        'user_obj': user_obj,
+        'roles': all_roles,
+        'current_role': current_role
+    })
 
 @login_required
 @user_passes_test(is_system_admin)
@@ -669,21 +684,19 @@ class BankListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         if query:
             queryset = queryset.filter(
                 Q(bank_name__icontains=query) |
-                Q(code__icontains=query) |
                 Q(swift_code__icontains=query)
             )
         
         status = self.request.GET.get('status')
-        match status:
-            case 'active':
-                queryset = queryset.filter(is_active=True)
-            case 'inactive':
-                queryset = queryset.filter(is_active=False)
+        if status == 'active':
+            queryset = queryset.filter(is_active=True)
+        elif status == 'inactive':
+            queryset = queryset.filter(is_active=False)
         
         sort_field = self.request.GET.get('sort', 'created_at')
         order = self.request.GET.get('order', 'desc')
         
-        if sort_field in ['bank_name', 'code', 'is_active', 'created_at']:
+        if sort_field in ['bank_name', 'swift_code', 'is_active', 'created_at']:
             if order == 'desc':
                 sort_field = f'-{sort_field}'
             queryset = queryset.order_by(sort_field)
@@ -693,11 +706,13 @@ class BankListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        banks = self.get_queryset()
+        # Get all banks for statistics
+        all_banks = Bank.objects.all()
+        
         context.update({
             'sort_field': self.request.GET.get('sort', 'created_at'),
             'order': self.request.GET.get('order', 'desc'),
-            'active_banks_count': banks.filter(is_active=True).count(),
+            'active_banks_count': all_banks.filter(is_active=True).count(),
             'total_users_count': User.objects.filter(is_active=True).count(),
         })
         
@@ -768,12 +783,11 @@ def export_banks(request):
         response['Content-Disposition'] = 'attachment; filename="banks.csv"'
         
         writer = csv.writer(response)
-        writer.writerow(['Bank Name', 'Code', 'SWIFT Code', 'Status', 'Created By', 'Created At'])
+        writer.writerow(['Bank Name', 'SWIFT Code', 'Status', 'Created By', 'Created At'])
         
         for bank in banks:
             writer.writerow([
                 bank.bank_name,
-                bank.code,
                 bank.swift_code,
                 'Active' if bank.is_active else 'Inactive',
                 bank.created_by.get_full_name() or bank.created_by.username if bank.created_by else 'N/A',
@@ -790,7 +804,7 @@ def export_banks(request):
         ws = wb.add_sheet('Banks')
         
         row_num = 0
-        columns = ['Bank Name', 'Code', 'SWIFT Code', 'Status', 'Created By', 'Created At']
+        columns = ['Bank Name', 'SWIFT Code', 'Status', 'Created By', 'Created At']
         
         for col_num, column_title in enumerate(columns):
             ws.write(row_num, col_num, column_title)
@@ -798,11 +812,10 @@ def export_banks(request):
         for bank in banks:
             row_num += 1
             ws.write(row_num, 0, bank.bank_name)
-            ws.write(row_num, 1, bank.code or '')
-            ws.write(row_num, 2, bank.swift_code)
-            ws.write(row_num, 3, 'Active' if bank.is_active else 'Inactive')
-            ws.write(row_num, 4, bank.created_by.get_full_name() or bank.created_by.username if bank.created_by else 'N/A')
-            ws.write(row_num, 5, bank.created_at.strftime('%Y-%m-%d') if bank.created_at else 'N/A')
+            ws.write(row_num, 1, bank.swift_code)
+            ws.write(row_num, 2, 'Active' if bank.is_active else 'Inactive')
+            ws.write(row_num, 3, bank.created_by.get_full_name() or bank.created_by.username if bank.created_by else 'N/A')
+            ws.write(row_num, 4, bank.created_at.strftime('%Y-%m-%d') if bank.created_at else 'N/A')
         
         wb.save(response)
         return response
@@ -858,24 +871,20 @@ class ZoneListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        queryset = Zone.objects.all().annotate(
-            scheme_count=Count('schemes', distinct=True)
-        )
+        queryset = Zone.objects.all()
         
         query = self.request.GET.get('q')
         if query:
             queryset = queryset.filter(
                 Q(zone_code__icontains=query) |
-                Q(zone_name__icontains=query) |
-                Q(description__icontains=query)
+                Q(zone_name__icontains=query)
             )
         
         status = self.request.GET.get('status')
-        match status:
-            case 'active':
-                queryset = queryset.filter(is_active=True)
-            case 'inactive':
-                queryset = queryset.filter(is_active=False)
+        if status == 'active':
+            queryset = queryset.filter(is_active=True)
+        elif status == 'inactive':
+            queryset = queryset.filter(is_active=False)
         
         sort_field = self.request.GET.get('sort', 'created_at')
         order = self.request.GET.get('order', 'desc')
@@ -891,16 +900,10 @@ class ZoneListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         
         zones = self.get_queryset()
-        total_schemes_count = zones.aggregate(total=Sum('scheme_count'))['total'] or 0
-        avg_schemes_per_zone = zones.aggregate(avg=Avg('scheme_count'))['avg'] or 0
-        active_zones_count = zones.filter(is_active=True).count()
-        
         context.update({
             'sort_field': self.request.GET.get('sort', 'created_at'),
             'order': self.request.GET.get('order', 'desc'),
-            'total_schemes_count': total_schemes_count,
-            'avg_schemes_per_zone': avg_schemes_per_zone,
-            'active_zones_count': active_zones_count,
+            'active_zones_count': zones.filter(is_active=True).count(),
         })
         
         return context
@@ -1079,11 +1082,10 @@ class SupplierListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
             queryset = queryset.filter(bank_id=bank_id)
         
         status = self.request.GET.get('status')
-        match status:
-            case 'active':
-                queryset = queryset.filter(is_active=True)
-            case 'inactive':
-                queryset = queryset.filter(is_active=False)
+        if status == 'active':
+            queryset = queryset.filter(is_active=True)
+        elif status == 'inactive':
+            queryset = queryset.filter(is_active=False)
         
         sort_field = self.request.GET.get('sort', 'created_at')
         order = self.request.GET.get('order', 'desc')
@@ -1098,13 +1100,15 @@ class SupplierListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        suppliers = self.get_queryset()
-        total_suppliers = suppliers.count()
-        active_suppliers = suppliers.filter(is_active=True).count()
-        bank_count = suppliers.values('bank').distinct().count()
+        # Get all suppliers for statistics
+        all_suppliers = Supplier.objects.all()
         
+        # Calculate statistics
+        total_suppliers = all_suppliers.count()
+        active_suppliers = all_suppliers.filter(is_active=True).count()
+        bank_count = all_suppliers.values('bank').distinct().count()
         payment_count = EFTTransaction.objects.filter(
-            supplier__in=suppliers
+            supplier__in=all_suppliers
         ).count()
         
         context.update({
@@ -1300,8 +1304,7 @@ class SchemeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         if query:
             queryset = queryset.filter(
                 Q(scheme_code__icontains=query) |
-                Q(scheme_name__icontains=query) |
-                Q(description__icontains=query)
+                Q(scheme_name__icontains=query)
             )
         
         zone_id = self.request.GET.get('zone')
@@ -1313,11 +1316,10 @@ class SchemeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
                 self.current_zone = None
         
         status = self.request.GET.get('status')
-        match status:
-            case 'active':
-                queryset = queryset.filter(is_active=True)
-            case 'inactive':
-                queryset = queryset.filter(is_active=False)
+        if status == 'active':
+            queryset = queryset.filter(is_active=True)
+        elif status == 'inactive':
+            queryset = queryset.filter(is_active=False)
         
         sort_field = self.request.GET.get('sort', 'created_at')
         order = self.request.GET.get('order', 'desc')
@@ -1332,14 +1334,14 @@ class SchemeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        schemes = self.get_queryset()
-        total_schemes = schemes.count()
-        active_schemes_count = schemes.filter(is_active=True).count()
-        zones_count = schemes.values('zone').distinct().count()
+        # Get all schemes for statistics
+        all_schemes = Scheme.objects.all()
         
-        transactions_count = EFTTransaction.objects.filter(
-            scheme__in=schemes
-        ).count()
+        # Calculate statistics
+        total_schemes = all_schemes.count()
+        active_schemes_count = all_schemes.filter(is_active=True).count()
+        zones_count = all_schemes.values('zone').distinct().count()
+        transactions_count = EFTTransaction.objects.count()
         
         context.update({
             'sort_field': self.request.GET.get('sort', 'created_at'),
@@ -1549,16 +1551,14 @@ class DebitAccountListView(LoginRequiredMixin, PermissionRequiredMixin, ListView
         if query:
             queryset = queryset.filter(
                 Q(account_number__icontains=query) |
-                Q(account_name__icontains=query) |
-                Q(description__icontains=query)
+                Q(account_name__icontains=query)
             )
         
         status = self.request.GET.get('status')
-        match status:
-            case 'active':
-                queryset = queryset.filter(is_active=True)
-            case 'inactive':
-                queryset = queryset.filter(is_active=False)
+        if status == 'active':
+            queryset = queryset.filter(is_active=True)
+        elif status == 'inactive':
+            queryset = queryset.filter(is_active=False)
         
         sort_field = self.request.GET.get('sort', 'created_at')
         order = self.request.GET.get('order', 'desc')
@@ -1573,19 +1573,17 @@ class DebitAccountListView(LoginRequiredMixin, PermissionRequiredMixin, ListView
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        accounts = self.get_queryset()
-        total_accounts = accounts.count()
-        active_accounts = accounts.filter(is_active=True).count()
+        # Get all accounts for statistics
+        all_accounts = DebitAccount.objects.all()
         
-        transactions_count = EFTBatch.objects.filter(
-            debit_account__in=accounts
-        ).count()
+        # Calculate total transactions count
+        transactions_count = EFTTransaction.objects.count()
         
         context.update({
             'sort_field': self.request.GET.get('sort', 'created_at'),
             'order': self.request.GET.get('order', 'desc'),
-            'total_accounts': total_accounts,
-            'active_accounts': active_accounts,
+            'total_accounts': all_accounts.count(),
+            'active_accounts': all_accounts.filter(is_active=True).count(),
             'transactions_count': transactions_count,
         })
         

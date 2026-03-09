@@ -23,62 +23,92 @@
                 <form method="post">
                     {% csrf_token %}
                     
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="username" class="form-label">
+                            <label for="{{ form.username.id_for_label }}" class="form-label">
                                 Username <span class="text-danger">*</span>
                             </label>
-                            <input type="text" name="username" id="username" 
-                                   class="form-control" value="{{ user_obj.username }}" required>
+                            {{ form.username }}
+                            {% if form.username.errors %}
+                                <div class="text-danger small">
+                                    {{ form.username.errors }}
+                                </div>
+                            {% endif %}
+                            {% if form.username.help_text %}
+                                <small class="form-text text-muted">{{ form.username.help_text }}</small>
+                            {% endif %}
                         </div>
 
                         <div class="col-md-6 mb-3">
-                            <label for="email" class="form-label">
+                            <label for="{{ form.email.id_for_label }}" class="form-label">
                                 Email <span class="text-danger">*</span>
                             </label>
-                            <input type="email" name="email" id="email" 
-                                   class="form-control" value="{{ user_obj.email }}" required>
+                            {{ form.email }}
+                            {% if form.email.errors %}
+                                <div class="text-danger small">
+                                    {{ form.email.errors }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="first_name" class="form-label">
+                            <label for="{{ form.first_name.id_for_label }}" class="form-label">
                                 First Name
                             </label>
-                            <input type="text" name="first_name" id="first_name" 
-                                   class="form-control" value="{{ user_obj.first_name }}">
+                            {{ form.first_name }}
+                            {% if form.first_name.errors %}
+                                <div class="text-danger small">
+                                    {{ form.first_name.errors }}
+                                </div>
+                            {% endif %}
                         </div>
 
                         <div class="col-md-6 mb-3">
-                            <label for="last_name" class="form-label">
+                            <label for="{{ form.last_name.id_for_label }}" class="form-label">
                                 Last Name
                             </label>
-                            <input type="text" name="last_name" id="last_name" 
-                                   class="form-control" value="{{ user_obj.last_name }}">
+                            {{ form.last_name }}
+                            {% if form.last_name.errors %}
+                                <div class="text-danger small">
+                                    {{ form.last_name.errors }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label for="role" class="form-label">
+                        <label for="{{ form.role.id_for_label }}" class="form-label">
                             Role <span class="text-danger">*</span>
                         </label>
-                        <select name="role" id="role" class="form-control" required>
-                            <option value="">-- Select Role --</option>
-                            {% for role in roles %}
-                            <option value="{{ role }}" {% if role == current_role %}selected{% endif %}>
-                                {{ role }}
-                            </option>
-                            {% endfor %}
-                        </select>
+                        {{ form.role }}
+                        {% if form.role.errors %}
+                            <div class="text-danger small">
+                                {{ form.role.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">Select the user's role in the system</small>
                     </div>
 
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="is_active" name="is_active" 
-                               {% if user_obj.is_active %}checked{% endif %}>
-                        <label class="form-check-label" for="is_active">
+                        {{ form.is_active }}
+                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
                             Active User
                         </label>
+                        {% if form.is_active.errors %}
+                            <div class="text-danger small">
+                                {{ form.is_active.errors }}
+                            </div>
+                        {% endif %}
                         <small class="form-text text-muted d-block">
                             Uncheck to disable user account
                         </small>
