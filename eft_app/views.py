@@ -1,5 +1,6 @@
-# eft_app/views.py - COMPLETE FIXED VERSION WITH ALL LIST VIEWS UPDATED
-# Updated for Django 5.0.6 and Python 3.14
+# eft_app/views.py - COMPLETE FILE
+# Fixed: Role-aware navigation for all users
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -34,33 +35,40 @@ from .forms import (
 )
 from .eft_generator import EFTGenerator
 
-# ================ COMMON VIEWS ================
+# ================ HELPER FUNCTIONS ================
 
-@login_required
-def dashboard(request):
-    """Role-based dashboard"""
-    user = request.user
-    
-    if user.is_superuser or user.groups.filter(name='System Admin').exists():
-        return redirect('admin_dashboard')
-    elif user.groups.filter(name='Accounts Personnel').exists():
-        return redirect('accounts_dashboard')
-    elif user.groups.filter(name='Finance Manager').exists():
-        return redirect('fm_dashboard')
-    elif user.groups.filter(name='Director of Finance').exists():
-        return redirect('director_dashboard')
+def get_user_role(user):
+    """Helper to get user's primary role as a string"""
+    if user.is_superuser:
+        return 'admin'
+    groups = user.groups.values_list('name', flat=True)
+    if 'System Admin' in groups:
+        return 'admin'
+    if 'Director of Finance' in groups:
+        return 'director'
+    if 'Finance Manager' in groups:
+        return 'finance_manager'
+    if 'Accounts Personnel' in groups:
+        return 'accounts'
+    return 'unknown'
+
+def format_time_ago(timestamp):
+    if not timestamp:
+        return 'Recently'
+    now = timezone.now()
+    diff = now - timestamp
+    if diff.days > 0:
+        return f'{diff.days} day{"s" if diff.days > 1 else ""} ago'
+    elif diff.seconds >= 3600:
+        hours = diff.seconds // 3600
+        return f'{hours} hour{"s" if hours > 1 else ""} ago'
+    elif diff.seconds >= 60:
+        minutes = diff.seconds // 60
+        return f'{minutes} minute{"s" if minutes > 1 else ""} ago'
     else:
-        messages.warning(request, 'No role assigned. Contact your system administrator.')
-        return redirect('logout')
-
-# ================ SYSTEM ADMIN VIEWS ================
-
-def is_system_admin(user):
-    """Check if user is system admin"""
-    return user.is_superuser or user.groups.filter(name='System Admin').exists()
+        return 'Just now'
 
 def check_database_connection():
-    """Check if database is connected properly"""
     try:
         User.objects.count()
         with connection.cursor() as cursor:
@@ -73,7 +81,6 @@ def check_database_connection():
         return True, str(e)
 
 def calculate_uptime():
-    """Calculate system uptime based on first user registration"""
     try:
         first_user = User.objects.order_by('date_joined').first()
         if first_user:
@@ -81,7 +88,6 @@ def calculate_uptime():
             days = uptime_delta.days
             hours = uptime_delta.seconds // 3600
             minutes = (uptime_delta.seconds % 3600) // 60
-            
             if days > 0:
                 if hours > 0:
                     return f"{days}d {hours}h"
@@ -97,13 +103,260 @@ def calculate_uptime():
     except:
         return "1 day"
 
+# ================ ROLE CHECK FUNCTIONS ================
+
+def is_system_admin(user):
+    return user.is_superuser or user.groups.filter(name='System Admin').exists()
+
+def is_accounts_personnel(user):
+    return user.groups.filter(name='Accounts Personnel').exists()
+
+def is_finance_manager(user):
+    return user.groups.filter(name='Finance Manager').exists()
+
+def is_director_of_finance(user):
+    return user.groups.filter(name='Director of Finance').exists()
+
+# ================ COMMON VIEWS ================
+
+@login_required
+def dashboard(request):
+    user = request.user
+    if user.is_superuser or user.groups.filter(name='System Admin').exists():
+        return redirect('admin_dashboard')
+    elif user.groups.filter(name='Director of Finance').exists():
+        return redirect('director_dashboard')
+    elif user.groups.filter(name='Finance Manager').exists():
+        return redirect('fm_dashboard')
+    elif user.groups.filter(name='Accounts Personnel').exists():
+        return redirect('accounts_dashboard')
+    else:
+        messages.warning(request, 'No role assigned. Contact your system administrator.')
+        return redirect('logout')
+
+# ================ FIXED VIEW BATCH - ROLE AWARE ================
+
+@login_required
+def view_batch(request, batch_id):
+    """Role-aware batch view - works for all user types (Accounts, FM, Director, Admin)"""
+    batch = get_object_or_404(EFTBatch, id=batch_id)
+    
+    # Check permissions
+    user = request.user
+    user_role = get_user_role(user)
+    
+    has_permission = (
+        batch.created_by == user or
+        user.is_superuser or
+        user_role in ['admin', 'accounts', 'finance_manager', 'director']
+    )
+    
+    if not has_permission:
+        messages.error(request, 'Permission denied')
+        return redirect('dashboard')
+    
+    # Determine role-appropriate URLs based on user's role AND batch status
+    if user_role == 'admin':
+        back_url = reverse('admin_dashboard')
+        dashboard_url = reverse('admin_dashboard')
+        list_url = reverse('admin_dashboard')
+    elif user_role == 'director':
+        dashboard_url = reverse('director_dashboard')
+        list_url = reverse('director_batch_list')
+        if batch.status == 'PENDING_DIRECTOR':
+            back_url = reverse('director_review_batch', args=[batch.id])
+        else:
+            back_url = reverse('director_batch_list')
+    elif user_role == 'finance_manager':
+        dashboard_url = reverse('fm_dashboard')
+        list_url = reverse('fm_batch_list')
+        if batch.status == 'PENDING_FM':
+            back_url = reverse('fm_review_batch', args=[batch.id])
+        else:
+            back_url = reverse('fm_batch_list')
+    else:  # accounts or unknown
+        dashboard_url = reverse('accounts_dashboard')
+        list_url = reverse('batch_list')
+        if batch.status == 'DRAFT':
+            back_url = reverse('edit_batch', args=[batch.id])
+        else:
+            back_url = reverse('batch_list')
+    
+    # Get audit logs
+    audit_logs = batch.audit_logs.all().order_by('-timestamp')
+    total_amount = sum(t.amount for t in batch.transactions.all())
+    
+    # Determine if user can export
+    can_export = (
+        user.has_perm('eft_app.can_export_eft') or
+        user_role in ['accounts', 'director', 'admin']
+    )
+    
+    # Determine if user can preview
+    can_preview = batch.status not in ['DRAFT', 'REJECTED']
+    
+    context = {
+        'batch': batch,
+        'transactions': batch.transactions.all().order_by('sequence_number'),
+        'audit_logs': audit_logs,
+        'total_amount': total_amount,
+        'back_url': back_url,
+        'dashboard_url': dashboard_url,
+        'list_url': list_url,
+        'user_role': user_role,
+        'can_export': can_export,
+        'can_preview': can_preview,
+    }
+    
+    return render(request, 'shared/view_batch.html', context)
+
+
+# ================ FIXED PREVIEW EFT FILE ================
+
+@login_required
+def preview_eft_file(request, batch_id):
+    """Read-only preview of the EFT file content - role aware"""
+    batch = get_object_or_404(EFTBatch, id=batch_id)
+
+    # Permission check
+    user = request.user
+    user_role = get_user_role(user)
+    
+    can_preview = (
+        batch.created_by == user or
+        user.has_perm('eft_app.can_approve_eft') or
+        user.has_perm('eft_app.can_fm_review_eft') or
+        user.has_perm('eft_app.can_export_eft') or
+        user.is_superuser or
+        user_role in ['admin', 'accounts', 'finance_manager', 'director']
+    )
+    
+    if not can_preview:
+        messages.error(request, 'You do not have permission to preview this file')
+        return redirect('dashboard')
+
+    if batch.status not in ('PENDING_FM', 'PENDING_DIRECTOR', 'APPROVED', 'EXPORTED'):
+        messages.error(request, 'File preview is only available once a batch has been submitted for review')
+        return redirect('dashboard')
+
+    try:
+        content = EFTGenerator.generate_eft_file(batch)
+        lines = content.strip().split('\n')
+        header = lines[0] if lines else ''
+        body_rows = lines[1:] if len(lines) > 1 else []
+    except Exception as e:
+        messages.error(request, f'Could not generate preview: {str(e)}')
+        return redirect('view_batch', batch_id=batch.id)
+
+    # Determine role-appropriate URLs for the preview template
+    if user_role == 'director':
+        if batch.status == 'PENDING_DIRECTOR':
+            back_url = reverse('director_review_batch', args=[batch.id])
+        else:
+            back_url = reverse('director_batch_list')
+        dashboard_url = reverse('director_dashboard')
+    elif user_role == 'finance_manager':
+        if batch.status == 'PENDING_FM':
+            back_url = reverse('fm_review_batch', args=[batch.id])
+        else:
+            back_url = reverse('fm_batch_list')
+        dashboard_url = reverse('fm_dashboard')
+    elif user_role == 'accounts':
+        back_url = reverse('view_batch', args=[batch.id])
+        dashboard_url = reverse('accounts_dashboard')
+    else:
+        back_url = reverse('view_batch', args=[batch.id])
+        dashboard_url = reverse('dashboard')
+    
+    # Check if user can export
+    can_export = (
+        user.has_perm('eft_app.can_export_eft') or
+        user_role in ['accounts', 'director', 'admin']
+    )
+
+    context = {
+        'batch': batch,
+        'header': header,
+        'body_rows': body_rows,
+        'total_lines': len(lines),
+        'filename': batch.get_obdx_filename('txt'),
+        'back_url': back_url,
+        'dashboard_url': dashboard_url,
+        'user_role': user_role,
+        'can_export': can_export,
+    }
+    return render(request, 'shared/preview_eft_file.html', context)
+
+
+# ================ FIXED EXPORT BATCH ================
+
+@login_required
+def export_batch(request, batch_id, format='txt'):
+    """Export the EFT file for an approved or already-exported batch."""
+    batch = get_object_or_404(EFTBatch, id=batch_id)
+    user_role = get_user_role(request.user)
+
+    # Permission check
+    can_export = (
+        request.user.has_perm('eft_app.can_export_eft') or
+        user_role in ['accounts', 'director', 'admin']
+    )
+    
+    if not can_export:
+        messages.error(request, 'You do not have permission to export this file')
+        return redirect('view_batch', batch_id=batch.id)
+
+    # Status check
+    if batch.status not in ('APPROVED', 'EXPORTED'):
+        messages.error(
+            request,
+            f'Only approved batches can be exported. '
+            f'Current status: {batch.get_status_display()}'
+        )
+        return redirect('view_batch', batch_id=batch.id)
+
+    # Party ID sanity check
+    if batch.get_party_id() == '000000000':
+        messages.error(request, 'Cannot export: No valid debit account found.')
+        return redirect('view_batch', batch_id=batch.id)
+
+    # Generate content
+    try:
+        content = EFTGenerator.generate_eft_file(batch)
+    except Exception as e:
+        messages.error(request, f'Export failed: {str(e)}')
+        return redirect('view_batch', batch_id=batch.id)
+
+    # Build filename and response
+    filename = batch.get_obdx_filename(format)
+    response = HttpResponse(content, content_type='application/octet-stream')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Content-Length'] = str(len(content.encode('utf-8')))
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+
+    # First-time download: flip status and log
+    if batch.status == 'APPROVED':
+        batch.status = 'EXPORTED'
+        batch.save(update_fields=['status', 'updated_at'])
+        ApprovalAuditLog.objects.create(
+            batch=batch,
+            action='EXPORTED',
+            user=request.user,
+            remarks=f'Exported as {filename}',
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
+
+    return response
+
+# ================ SYSTEM ADMIN VIEWS ================
+
 @login_required
 @user_passes_test(is_system_admin)
 def admin_dashboard(request):
-    """System Admin Dashboard"""
     try:
         db_connected, db_error = check_database_connection()
-        
         stats = {}
         try:
             stats = {
@@ -117,248 +370,148 @@ def admin_dashboard(request):
             }
         except (OperationalError, DatabaseError):
             stats = {
-                'users_count': 0,
-                'active_users_count': 0,
-                'banks_count': 0,
-                'suppliers_count': 0,
-                'zones_count': 0,
-                'schemes_count': 0,
+                'users_count': 0, 'active_users_count': 0, 'banks_count': 0,
+                'suppliers_count': 0, 'zones_count': 0, 'schemes_count': 0,
                 'debit_accounts_count': 0,
             }
-        
         uptime = calculate_uptime()
         today = timezone.now().date()
-        
         today_batches_count = 0
         last_batch = None
         try:
-            today_batches_count = EFTBatch.objects.filter(
-                created_at__date=today
-            ).count()
+            today_batches_count = EFTBatch.objects.filter(created_at__date=today).count()
             last_batch = EFTBatch.objects.order_by('-created_at').first()
         except (OperationalError, DatabaseError):
             pass
-        
         current_date = timezone.now()
         python_version = platform.python_version()
-        
         context = {
-            'stats': stats,
-            'db_connected': db_connected,
+            'stats': stats, 'db_connected': db_connected,
             'db_error': db_error if not db_connected else None,
-            'uptime': uptime,
-            'today_batches_count': today_batches_count,
-            'last_batch': last_batch,
-            'current_date': current_date,
-            'python_version': python_version,
-            'django_version': '5.0.6',
+            'uptime': uptime, 'today_batches_count': today_batches_count,
+            'last_batch': last_batch, 'current_date': current_date,
+            'python_version': python_version, 'django_version': '5.0.6',
             'debug': settings.DEBUG,
         }
-        
         return render(request, 'admin/dashboard.html', context)
-        
     except Exception as e:
         context = {
-            'stats': {
-                'users_count': 0,
-                'active_users_count': 0,
-                'banks_count': 0,
-                'suppliers_count': 0,
-                'zones_count': 0,
-                'schemes_count': 0,
-                'debit_accounts_count': 0,
-            },
-            'db_connected': False,
-            'db_error': str(e),
-            'uptime': "1 day",
-            'today_batches_count': 0,
-            'last_batch': None,
-            'current_date': timezone.now(),
-            'python_version': 'Unknown',
-            'django_version': 'Unknown',
-            'debug': settings.DEBUG,
+            'stats': {'users_count': 0, 'active_users_count': 0, 'banks_count': 0,
+                      'suppliers_count': 0, 'zones_count': 0, 'schemes_count': 0,
+                      'debit_accounts_count': 0},
+            'db_connected': False, 'db_error': str(e), 'uptime': "1 day",
+            'today_batches_count': 0, 'last_batch': None, 'current_date': timezone.now(),
+            'python_version': 'Unknown', 'django_version': 'Unknown', 'debug': settings.DEBUG,
         }
         return render(request, 'admin/dashboard.html', context)
 
 @login_required
 @user_passes_test(is_system_admin)
 def api_system_activity(request):
-    """API endpoint for system activity feed"""
     try:
         activities = []
-        
         db_connected, _ = check_database_connection()
         if not db_connected:
-            return JsonResponse({
-                'success': False,
-                'error': 'Database not connected',
-                'activities': []
-            })
-        
+            return JsonResponse({'success': False, 'error': 'Database not connected', 'activities': []})
         try:
             recent_users = User.objects.order_by('-date_joined')[:3]
             for user in recent_users:
                 activities.append({
-                    'icon': 'fas fa-user-plus',
-                    'icon_color': 'bg-success',
+                    'icon': 'fas fa-user-plus', 'icon_color': 'bg-success',
                     'title': 'New User Registration',
                     'description': f'User "{user.get_full_name() or user.username}" registered',
                     'time': format_time_ago(user.date_joined)
                 })
-        except:
-            pass
-        
+        except: pass
         try:
             recent_banks = Bank.objects.order_by('-created_at')[:2]
             for bank in recent_banks:
                 activities.append({
-                    'icon': 'fas fa-university',
-                    'icon_color': 'bg-primary',
+                    'icon': 'fas fa-university', 'icon_color': 'bg-primary',
                     'title': 'Bank Added',
                     'description': f'Bank "{bank.bank_name}" configured',
                     'time': format_time_ago(bank.created_at) if bank.created_at else 'Recently'
                 })
-        except:
-            pass
-        
+        except: pass
         try:
-            recent_batches = EFTBatch.objects.filter(status='APPROVED').order_by('-approved_at')[:3]
+            recent_batches = EFTBatch.objects.filter(status__in=['APPROVED', 'EXPORTED']).order_by('-approved_at')[:3]
             for batch in recent_batches:
                 activities.append({
-                    'icon': 'fas fa-file-invoice-dollar',
-                    'icon_color': 'bg-warning',
+                    'icon': 'fas fa-file-invoice-dollar', 'icon_color': 'bg-warning',
                     'title': 'EFT Batch Approved',
                     'description': f'Batch "{batch.batch_name}" approved',
                     'time': format_time_ago(batch.approved_at) if batch.approved_at else 'Recently'
                 })
-        except:
-            pass
-        
+        except: pass
         if not activities:
             activities.append({
-                'icon': 'fas fa-info-circle',
-                'icon_color': 'bg-info',
-                'title': 'System Ready',
-                'description': 'CRWB EFT System is operational',
+                'icon': 'fas fa-info-circle', 'icon_color': 'bg-info',
+                'title': 'System Ready', 'description': 'CRWB EFT System is operational',
                 'time': 'Just now'
             })
-        
         activities.sort(key=lambda x: x.get('time', ''), reverse=True)
-        
         return JsonResponse({
-            'success': True,
-            'activities': activities[:10],
-            'timestamp': timezone.now().isoformat(),
-            'db_connected': db_connected
+            'success': True, 'activities': activities[:10],
+            'timestamp': timezone.now().isoformat(), 'db_connected': db_connected
         })
-        
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e),
-            'activities': []
-        }, status=500)
+        return JsonResponse({'success': False, 'error': str(e), 'activities': []}, status=500)
 
 @login_required
 @user_passes_test(is_system_admin)
 def api_system_status(request):
-    """API endpoint for system status"""
     try:
         db_connected, db_error = check_database_connection()
-        
         active_users = 0
         if db_connected:
             try:
                 active_users = User.objects.filter(is_active=True).count()
-            except:
-                pass
-        
+            except: pass
         system_info = {
-            'python_version': platform.python_version(),
-            'django_version': '5.0.6',
-            'os': platform.system(),
-            'server_time': timezone.now().isoformat(),
+            'python_version': platform.python_version(), 'django_version': '5.0.6',
+            'os': platform.system(), 'server_time': timezone.now().isoformat(),
         }
-        
         return JsonResponse({
-            'success': True,
-            'system_info': system_info,
+            'success': True, 'system_info': system_info,
             'database_connected': db_connected,
             'database_error': db_error if not db_connected else None,
-            'active_users': active_users,
-            'server_time': timezone.now().isoformat(),
+            'active_users': active_users, 'server_time': timezone.now().isoformat(),
         })
-        
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
-
-def format_time_ago(timestamp):
-    """Format timestamp as time ago"""
-    if not timestamp:
-        return 'Recently'
-    
-    now = timezone.now()
-    diff = now - timestamp
-    
-    if diff.days > 0:
-        return f'{diff.days} day{"s" if diff.days > 1 else ""} ago'
-    elif diff.seconds >= 3600:
-        hours = diff.seconds // 3600
-        return f'{hours} hour{"s" if hours > 1 else ""} ago'
-    elif diff.seconds >= 60:
-        minutes = diff.seconds // 60
-        return f'{minutes} minute{"s" if minutes > 1 else ""} ago'
-    else:
-        return 'Just now'
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 # ================ USER MANAGEMENT VIEWS ================
 
 @login_required
 @user_passes_test(is_system_admin)
 def user_list(request):
-    """List all system users with search and filter"""
     users = User.objects.all().order_by('-date_joined')
-    
     query = request.GET.get('q')
     if query:
         users = users.filter(
-            Q(username__icontains=query) |
-            Q(email__icontains=query) |
-            Q(first_name__icontains=query) |
-            Q(last_name__icontains=query)
+            Q(username__icontains=query) | Q(email__icontains=query) |
+            Q(first_name__icontains=query) | Q(last_name__icontains=query)
         )
-    
     role_filter = request.GET.get('role')
     if role_filter:
         match role_filter:
-            case 'Superuser':
-                users = users.filter(is_superuser=True)
+            case 'Superuser': users = users.filter(is_superuser=True)
             case 'System Admin' | 'Accounts Personnel' | 'Finance Manager' | 'Director of Finance':
                 users = users.filter(groups__name=role_filter)
-    
     status_filter = request.GET.get('status')
     match status_filter:
-        case 'active':
-            users = users.filter(is_active=True)
-        case 'inactive':
-            users = users.filter(is_active=False)
-    
+        case 'active': users = users.filter(is_active=True)
+        case 'inactive': users = users.filter(is_active=False)
     sort_field = request.GET.get('sort', 'date_joined')
     order = request.GET.get('order', 'desc')
-    
     if sort_field in ['username', 'email', 'date_joined', 'last_login']:
         if order == 'desc':
             sort_field = f'-{sort_field}'
         users = users.order_by(sort_field)
-    
     total_users = users.count()
     active_users_count = users.filter(is_active=True).count()
     superusers_count = users.filter(is_superuser=True).count()
     recent_logins = users.filter(last_login__date=timezone.now().date()).count()
-    
     paginator = Paginator(users, 20)
     page_number = request.GET.get('page')
     try:
@@ -367,25 +520,18 @@ def user_list(request):
         page_obj = paginator.page(1)
     except EmptyPage:
         page_obj = paginator.page(paginator.num_pages)
-    
     context = {
-        'users': page_obj,
-        'page_obj': page_obj,
+        'users': page_obj, 'page_obj': page_obj,
         'is_paginated': paginator.num_pages > 1,
-        'sort_field': sort_field.lstrip('-'),
-        'order': order,
-        'total_users': total_users,
-        'active_users_count': active_users_count,
-        'superusers_count': superusers_count,
-        'recent_logins': recent_logins,
+        'sort_field': sort_field.lstrip('-'), 'order': order,
+        'total_users': total_users, 'active_users_count': active_users_count,
+        'superusers_count': superusers_count, 'recent_logins': recent_logins,
     }
-    
     return render(request, 'admin/user_list.html', context)
 
 @login_required
 @user_passes_test(is_system_admin)
 def user_create(request):
-    """Create new user"""
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST)
         if form.is_valid():
@@ -393,54 +539,35 @@ def user_create(request):
                 user = form.save(commit=False)
                 user.set_password(form.cleaned_data['password1'])
                 user.save()
-                
                 role = form.cleaned_data['role']
                 group = Group.objects.get(name=role)
                 user.groups.add(group)
-                
                 messages.success(request, f'User "{user.username}" created successfully with role "{role}"')
                 return redirect('user_list')
     else:
         form = UserRegistrationForm()
-    
     return render(request, 'admin/user_form.html', {'form': form})
 
 @login_required
 @user_passes_test(is_system_admin)
 def user_detail(request, user_id):
-    """User detail view"""
     user_obj = get_object_or_404(User, id=user_id)
-    
     batches_created = EFTBatch.objects.filter(created_by=user_obj).count()
     approved_batches = EFTBatch.objects.filter(approved_by=user_obj).count()
-    
-    context = {
-        'user_obj': user_obj,
-        'batches_created': batches_created,
-        'approved_batches': approved_batches,
-    }
-    
+    context = {'user_obj': user_obj, 'batches_created': batches_created, 'approved_batches': approved_batches}
     return render(request, 'admin/user_detail.html', context)
 
-# ================ FIXED USER EDIT FUNCTION ================
 @login_required
 @user_passes_test(is_system_admin)
 def user_edit(request, user_id):
-    """Edit existing user - FIXED VERSION with roles from database"""
     user_obj = get_object_or_404(User, id=user_id)
-    
-    # Get all available roles from the Group model
     all_roles = Group.objects.values_list('name', flat=True).order_by('name')
-    
-    # Get current role for the user
     current_role = user_obj.groups.first().name if user_obj.groups.exists() else ''
-    
     if request.method == 'POST':
         form = UserEditForm(request.POST, instance=user_obj)
         if form.is_valid():
             with db_transaction.atomic():
                 user = form.save()
-                
                 role = form.cleaned_data.get('role')
                 if role:
                     user.groups.clear()
@@ -448,36 +575,26 @@ def user_edit(request, user_id):
                     user.groups.add(group)
                     user.is_staff = (role == 'System Admin')
                     user.save()
-                
                 messages.success(request, f'User "{user.username}" updated successfully')
                 return redirect('user_list')
     else:
-        # Initialize form with current instance
         initial_data = {'role': current_role}
         form = UserEditForm(instance=user_obj, initial=initial_data)
-    
     return render(request, 'admin/user_edit.html', {
-        'form': form,
-        'user_obj': user_obj,
-        'roles': all_roles,
-        'current_role': current_role
+        'form': form, 'user_obj': user_obj, 'roles': all_roles, 'current_role': current_role
     })
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def user_delete(request, user_id):
-    """Actually delete the user — only called from confirmation POST"""
     user_obj = get_object_or_404(User, id=user_id)
-    
     if user_obj == request.user:
         messages.error(request, 'You cannot delete your own account')
         return redirect('user_list')
-    
     if user_obj.is_superuser:
         messages.error(request, 'Cannot delete superuser accounts')
         return redirect('user_list')
-    
     username = user_obj.username
     user_obj.delete()
     messages.success(request, f'User "{username}" deleted successfully')
@@ -486,55 +603,31 @@ def user_delete(request, user_id):
 @login_required
 @user_passes_test(is_system_admin)
 def user_delete_confirm(request, user_id):
-    """
-    Display user delete confirmation page
-    GET  → show confirmation page with user info and activity summary
-    POST → perform the actual deletion (calls user_delete)
-    """
     user_obj = get_object_or_404(User, id=user_id)
-   
-    # Gather stats to show on confirmation page
     try:
-        batches_created    = EFTBatch.objects.filter(created_by=user_obj).count()
-        batches_approved   = EFTBatch.objects.filter(approved_by=user_obj).count()
-        banks_created      = Bank.objects.filter(created_by=user_obj).count()
-        suppliers_created  = Supplier.objects.filter(created_by=user_obj).count()
+        batches_created = EFTBatch.objects.filter(created_by=user_obj).count()
+        batches_approved = EFTBatch.objects.filter(approved_by=user_obj).count()
+        banks_created = Bank.objects.filter(created_by=user_obj).count()
+        suppliers_created = Supplier.objects.filter(created_by=user_obj).count()
     except Exception:
         batches_created = batches_approved = banks_created = suppliers_created = 0
-   
-    has_activity = any([
-        batches_created > 0,
-        batches_approved > 0,
-        banks_created > 0,
-        suppliers_created > 0
-    ])
-   
+    has_activity = any([batches_created > 0, batches_approved > 0, banks_created > 0, suppliers_created > 0])
     context = {
-        'user_obj': user_obj,
-        'batches_created': batches_created,
-        'batches_approved': batches_approved,
-        'banks_created': banks_created,
-        'suppliers_created': suppliers_created,
-        'has_activity': has_activity,
+        'user_obj': user_obj, 'batches_created': batches_created,
+        'batches_approved': batches_approved, 'banks_created': banks_created,
+        'suppliers_created': suppliers_created, 'has_activity': has_activity,
     }
-   
     if request.method == 'POST':
-        # User confirmed deletion → execute delete
         return user_delete(request, user_id)
-   
-    # Show confirmation page
     return render(request, 'admin/user_confirm_delete.html', context)
 
 @login_required
 @user_passes_test(is_system_admin)
 def user_reset_password(request, user_id):
-    """Reset user password"""
     user_obj = get_object_or_404(User, id=user_id)
-    
     if request.method == 'POST':
         new_password = request.POST.get('new_password')
         confirm_password = request.POST.get('confirm_password')
-        
         if new_password == confirm_password:
             user_obj.set_password(new_password)
             user_obj.save()
@@ -542,75 +635,53 @@ def user_reset_password(request, user_id):
             return redirect('user_list')
         else:
             messages.error(request, 'Passwords do not match')
-    
     return render(request, 'admin/user_reset_password.html', {'user_obj': user_obj})
 
 @login_required
 @user_passes_test(is_system_admin)
 def user_toggle_status(request, user_id):
-    """Toggle user active status"""
     user_obj = get_object_or_404(User, id=user_id)
-    
     if user_obj == request.user:
         messages.error(request, 'You cannot change your own status')
         return redirect('user_list')
-    
     if user_obj.is_superuser:
         messages.error(request, 'Cannot change status of superuser')
         return redirect('user_list')
-    
     user_obj.is_active = not user_obj.is_active
     user_obj.save()
-    
     status = "activated" if user_obj.is_active else "deactivated"
     messages.success(request, f'User "{user_obj.username}" {status} successfully')
-    
     next_url = request.POST.get('next', request.GET.get('next', 'user_list'))
     return redirect(next_url)
 
 @login_required
 @user_passes_test(is_system_admin)
 def export_users(request):
-    """Export users to CSV or Excel"""
     format = request.GET.get('format', 'csv')
     users = User.objects.all().order_by('-date_joined')
-    
     if format == 'csv':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="users.csv"'
-        
         writer = csv.writer(response)
         writer.writerow(['Username', 'Full Name', 'Email', 'Role', 'Status', 'Last Login', 'Date Joined'])
-        
         for user in users:
             role = 'Superuser' if user.is_superuser else (user.groups.first().name if user.groups.exists() else 'No Role')
             writer.writerow([
-                user.username,
-                user.get_full_name(),
-                user.email,
-                role,
+                user.username, user.get_full_name(), user.email, role,
                 'Active' if user.is_active else 'Inactive',
                 user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never',
                 user.date_joined.strftime('%Y-%m-%d')
             ])
-        
         return response
-    
     elif format == 'excel':
         response = HttpResponse(content_type='application/ms-excel')
         response['Content-Disposition'] = 'attachment; filename="users.xls"'
-        
         wb = xlwt.Workbook(encoding='utf-8')
         ws = wb.add_sheet('Users')
-        
-        row_num = 0
         columns = ['Username', 'Full Name', 'Email', 'Role', 'Status', 'Last Login', 'Date Joined']
-        
         for col_num, column_title in enumerate(columns):
-            ws.write(row_num, col_num, column_title)
-        
-        for user in users:
-            row_num += 1
+            ws.write(0, col_num, column_title)
+        for row_num, user in enumerate(users, 1):
             role = 'Superuser' if user.is_superuser else (user.groups.first().name if user.groups.exists() else 'No Role')
             ws.write(row_num, 0, user.username)
             ws.write(row_num, 1, user.get_full_name() or '')
@@ -619,23 +690,18 @@ def export_users(request):
             ws.write(row_num, 4, 'Active' if user.is_active else 'Inactive')
             ws.write(row_num, 5, user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never')
             ws.write(row_num, 6, user.date_joined.strftime('%Y-%m-%d'))
-        
         wb.save(response)
         return response
-    
     return redirect('user_list')
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def user_bulk_activate(request):
-    """Bulk activate users"""
     user_ids = request.POST.getlist('user_ids')
     users = User.objects.filter(id__in=user_ids, is_superuser=False).exclude(id=request.user.id)
-    
     users.update(is_active=True)
     messages.success(request, f'{users.count()} user(s) activated successfully')
-    
     next_url = request.POST.get('next', 'user_list')
     return redirect(next_url)
 
@@ -643,13 +709,10 @@ def user_bulk_activate(request):
 @user_passes_test(is_system_admin)
 @require_POST
 def user_bulk_deactivate(request):
-    """Bulk deactivate users"""
     user_ids = request.POST.getlist('user_ids')
     users = User.objects.filter(id__in=user_ids, is_superuser=False).exclude(id=request.user.id)
-    
     users.update(is_active=False)
     messages.success(request, f'{users.count()} user(s) deactivated successfully')
-    
     next_url = request.POST.get('next', 'user_list')
     return redirect(next_url)
 
@@ -657,14 +720,11 @@ def user_bulk_deactivate(request):
 @user_passes_test(is_system_admin)
 @require_POST
 def user_bulk_delete(request):
-    """Bulk delete users"""
     user_ids = request.POST.getlist('user_ids')
     users = User.objects.filter(id__in=user_ids, is_superuser=False).exclude(id=request.user.id)
-    
     count = users.count()
     users.delete()
     messages.success(request, f'{count} user(s) deleted successfully')
-    
     next_url = request.POST.get('next', 'user_list')
     return redirect(next_url)
 
@@ -679,43 +739,28 @@ class BankListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     
     def get_queryset(self):
         queryset = Bank.objects.all().select_related('created_by')
-        
         query = self.request.GET.get('q')
         if query:
-            queryset = queryset.filter(
-                Q(bank_name__icontains=query) |
-                Q(swift_code__icontains=query)
-            )
-        
+            queryset = queryset.filter(Q(bank_name__icontains=query) | Q(swift_code__icontains=query))
         status = self.request.GET.get('status')
-        if status == 'active':
-            queryset = queryset.filter(is_active=True)
-        elif status == 'inactive':
-            queryset = queryset.filter(is_active=False)
-        
+        if status == 'active': queryset = queryset.filter(is_active=True)
+        elif status == 'inactive': queryset = queryset.filter(is_active=False)
         sort_field = self.request.GET.get('sort', 'created_at')
         order = self.request.GET.get('order', 'desc')
-        
         if sort_field in ['bank_name', 'swift_code', 'is_active', 'created_at']:
-            if order == 'desc':
-                sort_field = f'-{sort_field}'
+            if order == 'desc': sort_field = f'-{sort_field}'
             queryset = queryset.order_by(sort_field)
-        
         return queryset
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Get all banks for statistics
         all_banks = Bank.objects.all()
-        
         context.update({
             'sort_field': self.request.GET.get('sort', 'created_at'),
             'order': self.request.GET.get('order', 'desc'),
             'active_banks_count': all_banks.filter(is_active=True).count(),
             'total_users_count': User.objects.filter(is_active=True).count(),
         })
-        
         return context
 
 class BankCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
@@ -724,7 +769,6 @@ class BankCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     template_name = 'admin/bank_form.html'
     permission_required = 'eft_app.add_bank'
     success_url = reverse_lazy('bank_list')
-    
     def form_valid(self, form):
         form.instance.created_by = self.request.user
         messages.success(self.request, 'Bank created successfully')
@@ -742,7 +786,6 @@ class BankUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     template_name = 'admin/bank_form.html'
     permission_required = 'eft_app.change_bank'
     success_url = reverse_lazy('bank_list')
-    
     def form_valid(self, form):
         messages.success(self.request, 'Bank updated successfully')
         return super().form_valid(form)
@@ -752,7 +795,6 @@ class BankDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
     template_name = 'admin/bank_confirm_delete.html'
     permission_required = 'eft_app.delete_bank'
     success_url = reverse_lazy('bank_list')
-    
     def delete(self, request, *args, **kwargs):
         messages.success(request, 'Bank deleted successfully')
         return super().delete(request, *args, **kwargs)
@@ -760,106 +802,76 @@ class BankDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
 @login_required
 @user_passes_test(is_system_admin)
 def bank_toggle_status(request, pk):
-    """Toggle bank active status"""
     bank = get_object_or_404(Bank, pk=pk)
     bank.is_active = not bank.is_active
     bank.save()
-    
     status = "activated" if bank.is_active else "deactivated"
     messages.success(request, f'Bank "{bank.bank_name}" {status} successfully')
-    
     next_url = request.POST.get('next', request.GET.get('next', 'bank_list'))
     return redirect(next_url)
 
 @login_required
 @user_passes_test(is_system_admin)
 def export_banks(request):
-    """Export banks to CSV or Excel"""
     format = request.GET.get('format', 'csv')
     banks = Bank.objects.all().order_by('bank_name')
-    
     if format == 'csv':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="banks.csv"'
-        
         writer = csv.writer(response)
         writer.writerow(['Bank Name', 'SWIFT Code', 'Status', 'Created By', 'Created At'])
-        
         for bank in banks:
             writer.writerow([
-                bank.bank_name,
-                bank.swift_code,
+                bank.bank_name, bank.swift_code,
                 'Active' if bank.is_active else 'Inactive',
                 bank.created_by.get_full_name() or bank.created_by.username if bank.created_by else 'N/A',
                 bank.created_at.strftime('%Y-%m-%d') if bank.created_at else 'N/A'
             ])
-        
         return response
-    
     elif format == 'excel':
         response = HttpResponse(content_type='application/ms-excel')
         response['Content-Disposition'] = 'attachment; filename="banks.xls"'
-        
         wb = xlwt.Workbook(encoding='utf-8')
         ws = wb.add_sheet('Banks')
-        
-        row_num = 0
         columns = ['Bank Name', 'SWIFT Code', 'Status', 'Created By', 'Created At']
-        
         for col_num, column_title in enumerate(columns):
-            ws.write(row_num, col_num, column_title)
-        
-        for bank in banks:
-            row_num += 1
+            ws.write(0, col_num, column_title)
+        for row_num, bank in enumerate(banks, 1):
             ws.write(row_num, 0, bank.bank_name)
             ws.write(row_num, 1, bank.swift_code)
             ws.write(row_num, 2, 'Active' if bank.is_active else 'Inactive')
             ws.write(row_num, 3, bank.created_by.get_full_name() or bank.created_by.username if bank.created_by else 'N/A')
             ws.write(row_num, 4, bank.created_at.strftime('%Y-%m-%d') if bank.created_at else 'N/A')
-        
         wb.save(response)
         return response
-    
     return redirect('bank_list')
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def bank_bulk_activate(request):
-    """Bulk activate banks"""
     bank_ids = request.POST.getlist('bank_ids')
     Bank.objects.filter(id__in=bank_ids).update(is_active=True)
-    
     messages.success(request, f'{len(bank_ids)} bank(s) activated successfully')
-    next_url = request.POST.get('next', 'bank_list')
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'bank_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def bank_bulk_deactivate(request):
-    """Bulk deactivate banks"""
     bank_ids = request.POST.getlist('bank_ids')
     Bank.objects.filter(id__in=bank_ids).update(is_active=False)
-    
     messages.success(request, f'{len(bank_ids)} bank(s) deactivated successfully')
-    next_url = request.POST.get('next', 'bank_list')
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'bank_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def bank_bulk_delete(request):
-    """Bulk delete banks"""
     bank_ids = request.POST.getlist('bank_ids')
-    banks = Bank.objects.filter(id__in=bank_ids)
-    
-    count = banks.count()
-    banks.delete()
+    count = Bank.objects.filter(id__in=bank_ids).delete()[0]
     messages.success(request, f'{count} bank(s) deleted successfully')
-    
-    next_url = request.POST.get('next', 'bank_list')
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'bank_list'))
 
 # ================ ZONE CRUD VIEWS ================
 
@@ -869,43 +881,28 @@ class ZoneListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     context_object_name = 'zones'
     permission_required = 'eft_app.view_zone'
     paginate_by = 20
-    
     def get_queryset(self):
         queryset = Zone.objects.all()
-        
         query = self.request.GET.get('q')
         if query:
-            queryset = queryset.filter(
-                Q(zone_code__icontains=query) |
-                Q(zone_name__icontains=query)
-            )
-        
+            queryset = queryset.filter(Q(zone_code__icontains=query) | Q(zone_name__icontains=query))
         status = self.request.GET.get('status')
-        if status == 'active':
-            queryset = queryset.filter(is_active=True)
-        elif status == 'inactive':
-            queryset = queryset.filter(is_active=False)
-        
+        if status == 'active': queryset = queryset.filter(is_active=True)
+        elif status == 'inactive': queryset = queryset.filter(is_active=False)
         sort_field = self.request.GET.get('sort', 'created_at')
         order = self.request.GET.get('order', 'desc')
-        
         if sort_field in ['zone_code', 'zone_name', 'is_active', 'created_at']:
-            if order == 'desc':
-                sort_field = f'-{sort_field}'
+            if order == 'desc': sort_field = f'-{sort_field}'
             queryset = queryset.order_by(sort_field)
-        
         return queryset
-    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
         zones = self.get_queryset()
         context.update({
             'sort_field': self.request.GET.get('sort', 'created_at'),
             'order': self.request.GET.get('order', 'desc'),
             'active_zones_count': zones.filter(is_active=True).count(),
         })
-        
         return context
 
 class ZoneCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
@@ -914,7 +911,6 @@ class ZoneCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     template_name = 'admin/zone_form.html'
     permission_required = 'eft_app.add_zone'
     success_url = reverse_lazy('zone_list')
-    
     def form_valid(self, form):
         messages.success(self.request, 'Zone created successfully')
         return super().form_valid(form)
@@ -924,11 +920,9 @@ class ZoneDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
     template_name = 'admin/zone_detail.html'
     permission_required = 'eft_app.view_zone'
     context_object_name = 'zone'
-    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        zone = self.get_object()
-        context['schemes'] = zone.schemes.all()
+        context['schemes'] = self.get_object().schemes.all()
         return context
 
 class ZoneUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
@@ -937,7 +931,6 @@ class ZoneUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     template_name = 'admin/zone_form.html'
     permission_required = 'eft_app.change_zone'
     success_url = reverse_lazy('zone_list')
-    
     def form_valid(self, form):
         messages.success(self.request, 'Zone updated successfully')
         return super().form_valid(form)
@@ -947,7 +940,6 @@ class ZoneDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
     template_name = 'admin/zone_confirm_delete.html'
     permission_required = 'eft_app.delete_zone'
     success_url = reverse_lazy('zone_list')
-    
     def delete(self, request, *args, **kwargs):
         messages.success(request, 'Zone deleted successfully')
         return super().delete(request, *args, **kwargs)
@@ -955,106 +947,71 @@ class ZoneDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
 @login_required
 @user_passes_test(is_system_admin)
 def zone_toggle_status(request, pk):
-    """Toggle zone active status"""
     zone = get_object_or_404(Zone, pk=pk)
     zone.is_active = not zone.is_active
     zone.save()
-    
     status = "activated" if zone.is_active else "deactivated"
     messages.success(request, f'Zone "{zone.zone_name}" {status} successfully')
-    
-    next_url = request.POST.get('next', request.GET.get('next', 'zone_list'))
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'zone_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 def export_zones(request):
-    """Export zones to CSV or Excel"""
     format = request.GET.get('format', 'csv')
     zones = Zone.objects.all().order_by('zone_code')
-    
     if format == 'csv':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="zones.csv"'
-        
         writer = csv.writer(response)
         writer.writerow(['Zone Code', 'Zone Name', 'Description', 'Status', 'Created At'])
-        
         for zone in zones:
             writer.writerow([
-                zone.zone_code,
-                zone.zone_name,
-                zone.description or '',
+                zone.zone_code, zone.zone_name, zone.description or '',
                 'Active' if zone.is_active else 'Inactive',
                 zone.created_at.strftime('%Y-%m-%d') if zone.created_at else 'N/A'
             ])
-        
         return response
-    
     elif format == 'excel':
         response = HttpResponse(content_type='application/ms-excel')
         response['Content-Disposition'] = 'attachment; filename="zones.xls"'
-        
         wb = xlwt.Workbook(encoding='utf-8')
         ws = wb.add_sheet('Zones')
-        
-        row_num = 0
         columns = ['Zone Code', 'Zone Name', 'Description', 'Status', 'Created At']
-        
-        for col_num, column_title in enumerate(columns):
-            ws.write(row_num, col_num, column_title)
-        
-        for zone in zones:
-            row_num += 1
+        for col_num, col in enumerate(columns):
+            ws.write(0, col_num, col)
+        for row_num, zone in enumerate(zones, 1):
             ws.write(row_num, 0, zone.zone_code)
             ws.write(row_num, 1, zone.zone_name)
             ws.write(row_num, 2, zone.description or '')
             ws.write(row_num, 3, 'Active' if zone.is_active else 'Inactive')
             ws.write(row_num, 4, zone.created_at.strftime('%Y-%m-%d') if zone.created_at else 'N/A')
-        
         wb.save(response)
         return response
-    
     return redirect('zone_list')
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def zone_bulk_activate(request):
-    """Bulk activate zones"""
-    zone_ids = request.POST.getlist('zone_ids')
-    Zone.objects.filter(id__in=zone_ids).update(is_active=True)
-    
-    messages.success(request, f'{len(zone_ids)} zone(s) activated successfully')
-    next_url = request.POST.get('next', 'zone_list')
-    return redirect(next_url)
+    Zone.objects.filter(id__in=request.POST.getlist('zone_ids')).update(is_active=True)
+    messages.success(request, f'{len(request.POST.getlist("zone_ids"))} zone(s) activated')
+    return redirect(request.POST.get('next', 'zone_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def zone_bulk_deactivate(request):
-    """Bulk deactivate zones"""
-    zone_ids = request.POST.getlist('zone_ids')
-    Zone.objects.filter(id__in=zone_ids).update(is_active=False)
-    
-    messages.success(request, f'{len(zone_ids)} zone(s) deactivated successfully')
-    next_url = request.POST.get('next', 'zone_list')
-    return redirect(next_url)
+    Zone.objects.filter(id__in=request.POST.getlist('zone_ids')).update(is_active=False)
+    messages.success(request, f'{len(request.POST.getlist("zone_ids"))} zone(s) deactivated')
+    return redirect(request.POST.get('next', 'zone_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def zone_bulk_delete(request):
-    """Bulk delete zones"""
-    zone_ids = request.POST.getlist('zone_ids')
-    zones = Zone.objects.filter(id__in=zone_ids)
-    
-    count = zones.count()
-    zones.delete()
-    messages.success(request, f'{count} zone(s) deleted successfully')
-    
-    next_url = request.POST.get('next', 'zone_list')
-    return redirect(next_url)
+    count = Zone.objects.filter(id__in=request.POST.getlist('zone_ids')).delete()[0]
+    messages.success(request, f'{count} zone(s) deleted')
+    return redirect(request.POST.get('next', 'zone_list'))
 
 # ================ SUPPLIER CRUD VIEWS ================
 
@@ -1064,63 +1021,37 @@ class SupplierListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     context_object_name = 'suppliers'
     permission_required = 'eft_app.view_supplier'
     paginate_by = 20
-    
     def get_queryset(self):
         queryset = Supplier.objects.all().select_related('bank', 'created_by')
-        
         query = self.request.GET.get('q')
         if query:
             queryset = queryset.filter(
-                Q(supplier_code__icontains=query) |
-                Q(supplier_name__icontains=query) |
-                Q(account_number__icontains=query) |
-                Q(account_name__icontains=query)
+                Q(supplier_code__icontains=query) | Q(supplier_name__icontains=query) |
+                Q(account_number__icontains=query) | Q(account_name__icontains=query)
             )
-        
         bank_id = self.request.GET.get('bank')
-        if bank_id:
-            queryset = queryset.filter(bank_id=bank_id)
-        
+        if bank_id: queryset = queryset.filter(bank_id=bank_id)
         status = self.request.GET.get('status')
-        if status == 'active':
-            queryset = queryset.filter(is_active=True)
-        elif status == 'inactive':
-            queryset = queryset.filter(is_active=False)
-        
+        if status == 'active': queryset = queryset.filter(is_active=True)
+        elif status == 'inactive': queryset = queryset.filter(is_active=False)
         sort_field = self.request.GET.get('sort', 'created_at')
         order = self.request.GET.get('order', 'desc')
-        
         if sort_field in ['supplier_code', 'supplier_name', 'is_active', 'created_at']:
-            if order == 'desc':
-                sort_field = f'-{sort_field}'
+            if order == 'desc': sort_field = f'-{sort_field}'
             queryset = queryset.order_by(sort_field)
-        
         return queryset
-    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Get all suppliers for statistics
         all_suppliers = Supplier.objects.all()
-        
-        # Calculate statistics
-        total_suppliers = all_suppliers.count()
-        active_suppliers = all_suppliers.filter(is_active=True).count()
-        bank_count = all_suppliers.values('bank').distinct().count()
-        payment_count = EFTTransaction.objects.filter(
-            supplier__in=all_suppliers
-        ).count()
-        
         context.update({
             'sort_field': self.request.GET.get('sort', 'created_at'),
             'order': self.request.GET.get('order', 'desc'),
             'all_banks': Bank.objects.all(),
-            'total_suppliers': total_suppliers,
-            'active_suppliers': active_suppliers,
-            'bank_count': bank_count,
-            'payment_count': payment_count,
+            'total_suppliers': all_suppliers.count(),
+            'active_suppliers': all_suppliers.filter(is_active=True).count(),
+            'bank_count': all_suppliers.values('bank').distinct().count(),
+            'payment_count': EFTTransaction.objects.filter(supplier__in=all_suppliers).count(),
         })
-        
         return context
 
 class SupplierCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
@@ -1129,7 +1060,6 @@ class SupplierCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
     template_name = 'admin/supplier_form.html'
     permission_required = 'eft_app.add_supplier'
     success_url = reverse_lazy('supplier_list')
-    
     def form_valid(self, form):
         form.instance.created_by = self.request.user
         messages.success(self.request, 'Supplier created successfully')
@@ -1140,21 +1070,15 @@ class SupplierDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView
     template_name = 'admin/supplier_detail.html'
     permission_required = 'eft_app.view_supplier'
     context_object_name = 'supplier'
-    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         supplier = self.get_object()
-        
         transactions = EFTTransaction.objects.filter(supplier=supplier).select_related('batch', 'scheme')
-        total_payments = transactions.count()
-        total_amount = transactions.aggregate(Sum('amount'))['amount__sum'] or 0
-        
         context.update({
             'transactions': transactions[:10],
-            'total_payments': total_payments,
-            'total_amount': total_amount,
+            'total_payments': transactions.count(),
+            'total_amount': transactions.aggregate(Sum('amount'))['amount__sum'] or 0,
         })
-        
         return context
 
 class SupplierUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
@@ -1163,7 +1087,6 @@ class SupplierUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
     template_name = 'admin/supplier_form.html'
     permission_required = 'eft_app.change_supplier'
     success_url = reverse_lazy('supplier_list')
-    
     def form_valid(self, form):
         messages.success(self.request, 'Supplier updated successfully')
         return super().form_valid(form)
@@ -1173,7 +1096,6 @@ class SupplierDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView
     template_name = 'admin/supplier_confirm_delete.html'
     permission_required = 'eft_app.delete_supplier'
     success_url = reverse_lazy('supplier_list')
-    
     def delete(self, request, *args, **kwargs):
         messages.success(request, 'Supplier deleted successfully')
         return super().delete(request, *args, **kwargs)
@@ -1181,112 +1103,55 @@ class SupplierDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView
 @login_required
 @user_passes_test(is_system_admin)
 def supplier_toggle_status(request, pk):
-    """Toggle supplier active status"""
     supplier = get_object_or_404(Supplier, pk=pk)
     supplier.is_active = not supplier.is_active
     supplier.save()
-    
-    status = "activated" if supplier.is_active else "deactivated"
-    messages.success(request, f'Supplier "{supplier.supplier_name}" {status} successfully')
-    
-    next_url = request.POST.get('next', request.GET.get('next', 'supplier_list'))
-    return redirect(next_url)
+    messages.success(request, f'Supplier "{supplier.supplier_name}" {"activated" if supplier.is_active else "deactivated"}')
+    return redirect(request.POST.get('next', 'supplier_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 def export_suppliers(request):
-    """Export suppliers to CSV or Excel"""
     format = request.GET.get('format', 'csv')
     suppliers = Supplier.objects.all().select_related('bank', 'created_by').order_by('supplier_name')
-    
     if format == 'csv':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="suppliers.csv"'
-        
         writer = csv.writer(response)
         writer.writerow(['Supplier Code', 'Supplier Name', 'Bank', 'Account Number', 'Account Name', 'Status', 'Created By', 'Created At'])
-        
-        for supplier in suppliers:
+        for s in suppliers:
             writer.writerow([
-                supplier.supplier_code,
-                supplier.supplier_name,
-                supplier.bank.bank_name if supplier.bank else 'N/A',
-                supplier.account_number,
-                supplier.account_name,
-                'Active' if supplier.is_active else 'Inactive',
-                supplier.created_by.get_full_name() or supplier.created_by.username if supplier.created_by else 'N/A',
-                supplier.created_at.strftime('%Y-%m-%d') if supplier.created_at else 'N/A'
+                s.supplier_code, s.supplier_name, s.bank.bank_name if s.bank else 'N/A',
+                s.account_number, s.account_name, 'Active' if s.is_active else 'Inactive',
+                s.created_by.get_full_name() or s.created_by.username if s.created_by else 'N/A',
+                s.created_at.strftime('%Y-%m-%d') if s.created_at else 'N/A'
             ])
-        
         return response
-    
-    elif format == 'excel':
-        response = HttpResponse(content_type='application/ms-excel')
-        response['Content-Disposition'] = 'attachment; filename="suppliers.xls"'
-        
-        wb = xlwt.Workbook(encoding='utf-8')
-        ws = wb.add_sheet('Suppliers')
-        
-        row_num = 0
-        columns = ['Supplier Code', 'Supplier Name', 'Bank', 'Account Number', 'Account Name', 'Status', 'Created By', 'Created At']
-        
-        for col_num, column_title in enumerate(columns):
-            ws.write(row_num, col_num, column_title)
-        
-        for supplier in suppliers:
-            row_num += 1
-            ws.write(row_num, 0, supplier.supplier_code)
-            ws.write(row_num, 1, supplier.supplier_name)
-            ws.write(row_num, 2, supplier.bank.bank_name if supplier.bank else 'N/A')
-            ws.write(row_num, 3, supplier.account_number)
-            ws.write(row_num, 4, supplier.account_name)
-            ws.write(row_num, 5, 'Active' if supplier.is_active else 'Inactive')
-            ws.write(row_num, 6, supplier.created_by.get_full_name() or supplier.created_by.username if supplier.created_by else 'N/A')
-            ws.write(row_num, 7, supplier.created_at.strftime('%Y-%m-%d') if supplier.created_at else 'N/A')
-        
-        wb.save(response)
-        return response
-    
     return redirect('supplier_list')
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def supplier_bulk_activate(request):
-    """Bulk activate suppliers"""
-    supplier_ids = request.POST.getlist('supplier_ids')
-    Supplier.objects.filter(id__in=supplier_ids).update(is_active=True)
-    
-    messages.success(request, f'{len(supplier_ids)} supplier(s) activated successfully')
-    next_url = request.POST.get('next', 'supplier_list')
-    return redirect(next_url)
+    Supplier.objects.filter(id__in=request.POST.getlist('supplier_ids')).update(is_active=True)
+    messages.success(request, f'{len(request.POST.getlist("supplier_ids"))} supplier(s) activated')
+    return redirect(request.POST.get('next', 'supplier_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def supplier_bulk_deactivate(request):
-    """Bulk deactivate suppliers"""
-    supplier_ids = request.POST.getlist('supplier_ids')
-    Supplier.objects.filter(id__in=supplier_ids).update(is_active=False)
-    
-    messages.success(request, f'{len(supplier_ids)} supplier(s) deactivated successfully')
-    next_url = request.POST.get('next', 'supplier_list')
-    return redirect(next_url)
+    Supplier.objects.filter(id__in=request.POST.getlist('supplier_ids')).update(is_active=False)
+    messages.success(request, f'{len(request.POST.getlist("supplier_ids"))} supplier(s) deactivated')
+    return redirect(request.POST.get('next', 'supplier_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def supplier_bulk_delete(request):
-    """Bulk delete suppliers"""
-    supplier_ids = request.POST.getlist('supplier_ids')
-    suppliers = Supplier.objects.filter(id__in=supplier_ids)
-    
-    count = suppliers.count()
-    suppliers.delete()
-    messages.success(request, f'{count} supplier(s) deleted successfully')
-    
-    next_url = request.POST.get('next', 'supplier_list')
-    return redirect(next_url)
+    count = Supplier.objects.filter(id__in=request.POST.getlist('supplier_ids')).delete()[0]
+    messages.success(request, f'{count} supplier(s) deleted')
+    return redirect(request.POST.get('next', 'supplier_list'))
 
 # ================ SCHEME CRUD VIEWS ================
 
@@ -1296,66 +1161,34 @@ class SchemeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     context_object_name = 'schemes'
     permission_required = 'eft_app.view_scheme'
     paginate_by = 20
-    
     def get_queryset(self):
         queryset = Scheme.objects.all().select_related('zone')
-        
         query = self.request.GET.get('q')
         if query:
-            queryset = queryset.filter(
-                Q(scheme_code__icontains=query) |
-                Q(scheme_name__icontains=query)
-            )
-        
+            queryset = queryset.filter(Q(scheme_code__icontains=query) | Q(scheme_name__icontains=query))
         zone_id = self.request.GET.get('zone')
-        if zone_id:
-            queryset = queryset.filter(zone_id=zone_id)
-            try:
-                self.current_zone = Zone.objects.get(id=zone_id)
-            except Zone.DoesNotExist:
-                self.current_zone = None
-        
+        if zone_id: queryset = queryset.filter(zone_id=zone_id)
         status = self.request.GET.get('status')
-        if status == 'active':
-            queryset = queryset.filter(is_active=True)
-        elif status == 'inactive':
-            queryset = queryset.filter(is_active=False)
-        
+        if status == 'active': queryset = queryset.filter(is_active=True)
+        elif status == 'inactive': queryset = queryset.filter(is_active=False)
         sort_field = self.request.GET.get('sort', 'created_at')
         order = self.request.GET.get('order', 'desc')
-        
-        if sort_field in ['scheme_code', 'scheme_name', 'zone', 'is_active', 'created_at']:
-            if order == 'desc':
-                sort_field = f'-{sort_field}'
+        if sort_field in ['scheme_code', 'scheme_name', 'is_active', 'created_at']:
+            if order == 'desc': sort_field = f'-{sort_field}'
             queryset = queryset.order_by(sort_field)
-        
         return queryset
-    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Get all schemes for statistics
         all_schemes = Scheme.objects.all()
-        
-        # Calculate statistics
-        total_schemes = all_schemes.count()
-        active_schemes_count = all_schemes.filter(is_active=True).count()
-        zones_count = all_schemes.values('zone').distinct().count()
-        transactions_count = EFTTransaction.objects.count()
-        
         context.update({
             'sort_field': self.request.GET.get('sort', 'created_at'),
             'order': self.request.GET.get('order', 'desc'),
             'all_zones': Zone.objects.all(),
-            'total_schemes': total_schemes,
-            'active_schemes_count': active_schemes_count,
-            'zones_count': zones_count,
-            'transactions_count': transactions_count,
+            'total_schemes': all_schemes.count(),
+            'active_schemes_count': all_schemes.filter(is_active=True).count(),
+            'zones_count': all_schemes.values('zone').distinct().count(),
+            'transactions_count': EFTTransaction.objects.count(),
         })
-        
-        if hasattr(self, 'current_zone') and self.current_zone:
-            context['current_zone'] = self.current_zone
-        
         return context
 
 class SchemeCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
@@ -1364,23 +1197,8 @@ class SchemeCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     template_name = 'admin/scheme_form.html'
     permission_required = 'eft_app.add_scheme'
     success_url = reverse_lazy('scheme_list')
-    
-    def get_initial(self):
-        initial = super().get_initial()
-        zone_id = self.request.GET.get('zone')
-        if zone_id:
-            try:
-                zone = Zone.objects.get(id=zone_id)
-                initial['zone'] = zone
-            except Zone.DoesNotExist:
-                pass
-        return initial
-    
     def form_valid(self, form):
-        scheme_name = form.cleaned_data['scheme_name']
-        messages.success(self.request, 
-            mark_safe(f'Scheme "<strong>{scheme_name}</strong>" created successfully. '
-                      f'<a href="{reverse("scheme_list")}" class="alert-link">View all schemes</a>'))
+        messages.success(self.request, f'Scheme "{form.cleaned_data["scheme_name"]}" created successfully.')
         return super().form_valid(form)
 
 class SchemeDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
@@ -1388,22 +1206,6 @@ class SchemeDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
     template_name = 'admin/scheme_detail.html'
     permission_required = 'eft_app.view_scheme'
     context_object_name = 'scheme'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        scheme = self.get_object()
-        
-        transactions = EFTTransaction.objects.filter(scheme=scheme).select_related('batch', 'supplier')
-        total_transactions = transactions.count()
-        total_amount = transactions.aggregate(Sum('amount'))['amount__sum'] or 0
-        
-        context.update({
-            'transactions': transactions[:10],
-            'total_transactions': total_transactions,
-            'total_amount': total_amount,
-        })
-        
-        return context
 
 class SchemeUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Scheme
@@ -1411,12 +1213,8 @@ class SchemeUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     template_name = 'admin/scheme_form.html'
     permission_required = 'eft_app.change_scheme'
     success_url = reverse_lazy('scheme_list')
-    
     def form_valid(self, form):
-        scheme_name = form.cleaned_data['scheme_name']
-        messages.success(self.request, 
-            mark_safe(f'Scheme "<strong>{scheme_name}</strong>" updated successfully. '
-                      f'<a href="{reverse("scheme_list")}" class="alert-link">View all schemes</a>'))
+        messages.success(self.request, 'Scheme updated successfully')
         return super().form_valid(form)
 
 class SchemeDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
@@ -1424,7 +1222,6 @@ class SchemeDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
     template_name = 'admin/scheme_confirm_delete.html'
     permission_required = 'eft_app.delete_scheme'
     success_url = reverse_lazy('scheme_list')
-    
     def delete(self, request, *args, **kwargs):
         messages.success(request, 'Scheme deleted successfully')
         return super().delete(request, *args, **kwargs)
@@ -1432,108 +1229,58 @@ class SchemeDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
 @login_required
 @user_passes_test(is_system_admin)
 def scheme_toggle_status(request, pk):
-    """Toggle scheme active status"""
     scheme = get_object_or_404(Scheme, pk=pk)
     scheme.is_active = not scheme.is_active
     scheme.save()
-    
-    status = "activated" if scheme.is_active else "deactivated"
-    messages.success(request, f'Scheme "{scheme.scheme_name}" {status} successfully')
-    
-    next_url = request.POST.get('next', request.GET.get('next', 'scheme_list'))
-    return redirect(next_url)
+    messages.success(request, f'Scheme "{scheme.scheme_name}" {"activated" if scheme.is_active else "deactivated"}')
+    return redirect(request.POST.get('next', 'scheme_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 def export_schemes(request):
-    """Export schemes to CSV or Excel"""
     format = request.GET.get('format', 'csv')
     schemes = Scheme.objects.all().select_related('zone').order_by('scheme_code')
-    
     if format == 'csv':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="schemes.csv"'
-        
         writer = csv.writer(response)
         writer.writerow(['Scheme Code', 'Scheme Name', 'Zone', 'Default Cost Center', 'Status', 'Created At'])
-        
         for scheme in schemes:
             writer.writerow([
-                scheme.scheme_code,
-                scheme.scheme_name,
+                scheme.scheme_code, scheme.scheme_name,
                 f"{scheme.zone.zone_code} - {scheme.zone.zone_name}" if scheme.zone else 'N/A',
-                scheme.default_cost_center or '',
-                'Active' if scheme.is_active else 'Inactive',
+                scheme.default_cost_center or '', 'Active' if scheme.is_active else 'Inactive',
                 scheme.created_at.strftime('%Y-%m-%d') if scheme.created_at else 'N/A'
             ])
-        
         return response
-    
-    elif format == 'excel':
-        response = HttpResponse(content_type='application/ms-excel')
-        response['Content-Disposition'] = 'attachment; filename="schemes.xls"'
-        
-        wb = xlwt.Workbook(encoding='utf-8')
-        ws = wb.add_sheet('Schemes')
-        
-        row_num = 0
-        columns = ['Scheme Code', 'Scheme Name', 'Zone', 'Default Cost Center', 'Status', 'Created At']
-        
-        for col_num, column_title in enumerate(columns):
-            ws.write(row_num, col_num, column_title)
-        
-        for scheme in schemes:
-            row_num += 1
-            ws.write(row_num, 0, scheme.scheme_code)
-            ws.write(row_num, 1, scheme.scheme_name)
-            ws.write(row_num, 2, f"{scheme.zone.zone_code} - {scheme.zone.zone_name}" if scheme.zone else 'N/A')
-            ws.write(row_num, 3, scheme.default_cost_center or '')
-            ws.write(row_num, 4, 'Active' if scheme.is_active else 'Inactive')
-            ws.write(row_num, 5, scheme.created_at.strftime('%Y-%m-%d') if scheme.created_at else 'N/A')
-        
-        wb.save(response)
-        return response
-    
     return redirect('scheme_list')
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def scheme_bulk_activate(request):
-    """Bulk activate schemes"""
     scheme_ids = request.POST.getlist('scheme_ids')
     Scheme.objects.filter(id__in=scheme_ids).update(is_active=True)
-    
     messages.success(request, f'{len(scheme_ids)} scheme(s) activated successfully')
-    next_url = request.POST.get('next', 'scheme_list')
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'scheme_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def scheme_bulk_deactivate(request):
-    """Bulk deactivate schemes"""
     scheme_ids = request.POST.getlist('scheme_ids')
     Scheme.objects.filter(id__in=scheme_ids).update(is_active=False)
-    
     messages.success(request, f'{len(scheme_ids)} scheme(s) deactivated successfully')
-    next_url = request.POST.get('next', 'scheme_list')
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'scheme_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def scheme_bulk_delete(request):
-    """Bulk delete schemes"""
     scheme_ids = request.POST.getlist('scheme_ids')
-    schemes = Scheme.objects.filter(id__in=scheme_ids)
-    
-    count = schemes.count()
-    schemes.delete()
+    count = Scheme.objects.filter(id__in=scheme_ids).delete()[0]
     messages.success(request, f'{count} scheme(s) deleted successfully')
-    
-    next_url = request.POST.get('next', 'scheme_list')
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'scheme_list'))
 
 # ================ DEBIT ACCOUNT CRUD VIEWS ================
 
@@ -1543,51 +1290,6 @@ class DebitAccountListView(LoginRequiredMixin, PermissionRequiredMixin, ListView
     context_object_name = 'debit_accounts'
     permission_required = 'eft_app.view_debitaccount'
     paginate_by = 20
-    
-    def get_queryset(self):
-        queryset = DebitAccount.objects.all()
-        
-        query = self.request.GET.get('q')
-        if query:
-            queryset = queryset.filter(
-                Q(account_number__icontains=query) |
-                Q(account_name__icontains=query)
-            )
-        
-        status = self.request.GET.get('status')
-        if status == 'active':
-            queryset = queryset.filter(is_active=True)
-        elif status == 'inactive':
-            queryset = queryset.filter(is_active=False)
-        
-        sort_field = self.request.GET.get('sort', 'created_at')
-        order = self.request.GET.get('order', 'desc')
-        
-        if sort_field in ['account_number', 'account_name', 'is_active', 'created_at']:
-            if order == 'desc':
-                sort_field = f'-{sort_field}'
-            queryset = queryset.order_by(sort_field)
-        
-        return queryset
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # Get all accounts for statistics
-        all_accounts = DebitAccount.objects.all()
-        
-        # Calculate total transactions count
-        transactions_count = EFTTransaction.objects.count()
-        
-        context.update({
-            'sort_field': self.request.GET.get('sort', 'created_at'),
-            'order': self.request.GET.get('order', 'desc'),
-            'total_accounts': all_accounts.count(),
-            'active_accounts': all_accounts.filter(is_active=True).count(),
-            'transactions_count': transactions_count,
-        })
-        
-        return context
 
 class DebitAccountCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = DebitAccount
@@ -1595,32 +1297,9 @@ class DebitAccountCreateView(LoginRequiredMixin, PermissionRequiredMixin, Create
     template_name = 'admin/debit_account_form.html'
     permission_required = 'eft_app.add_debitaccount'
     success_url = reverse_lazy('debit_account_list')
-    
     def form_valid(self, form):
         messages.success(self.request, 'Debit Account created successfully')
         return super().form_valid(form)
-
-class DebitAccountDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
-    model = DebitAccount
-    template_name = 'admin/debit_account_detail.html'
-    permission_required = 'eft_app.view_debitaccount'
-    context_object_name = 'account'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        account = self.get_object()
-        
-        batches = EFTBatch.objects.filter(debit_account=account).order_by('-created_at')
-        total_batches = batches.count()
-        total_amount = batches.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-        
-        context.update({
-            'batches': batches[:10],
-            'total_batches': total_batches,
-            'total_amount': total_amount,
-        })
-        
-        return context
 
 class DebitAccountUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = DebitAccount
@@ -1628,904 +1307,487 @@ class DebitAccountUpdateView(LoginRequiredMixin, PermissionRequiredMixin, Update
     template_name = 'admin/debit_account_form.html'
     permission_required = 'eft_app.change_debitaccount'
     success_url = reverse_lazy('debit_account_list')
-    
-    def form_valid(self, form):
-        messages.success(self.request, 'Debit Account updated successfully')
-        return super().form_valid(form)
 
 class DebitAccountDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
     model = DebitAccount
     template_name = 'admin/debit_account_confirm_delete.html'
     permission_required = 'eft_app.delete_debitaccount'
     success_url = reverse_lazy('debit_account_list')
-    
-    def delete(self, request, *args, **kwargs):
-        messages.success(request, 'Debit Account deleted successfully')
-        return super().delete(request, *args, **kwargs)
 
 @login_required
 @user_passes_test(is_system_admin)
 def debit_account_toggle_status(request, pk):
-    """Toggle debit account active status"""
     account = get_object_or_404(DebitAccount, pk=pk)
     account.is_active = not account.is_active
     account.save()
-    
-    status = "activated" if account.is_active else "deactivated"
-    messages.success(request, f'Debit Account "{account.account_name}" {status} successfully')
-    
-    next_url = request.POST.get('next', request.GET.get('next', 'debit_account_list'))
-    return redirect(next_url)
+    messages.success(request, f'Debit Account "{account.account_name}" {"activated" if account.is_active else "deactivated"}')
+    return redirect(request.POST.get('next', 'debit_account_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 def export_debit_accounts(request):
-    """Export debit accounts to CSV or Excel"""
     format = request.GET.get('format', 'csv')
     accounts = DebitAccount.objects.all().order_by('account_number')
-    
     if format == 'csv':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="debit_accounts.csv"'
-        
         writer = csv.writer(response)
         writer.writerow(['Account Number', 'Account Name', 'Description', 'Status', 'Created At'])
-        
         for account in accounts:
             writer.writerow([
-                account.account_number,
-                account.account_name,
-                account.description or '',
+                account.account_number, account.account_name, account.description or '',
                 'Active' if account.is_active else 'Inactive',
                 account.created_at.strftime('%Y-%m-%d') if account.created_at else 'N/A'
             ])
-        
         return response
-    
-    elif format == 'excel':
-        response = HttpResponse(content_type='application/ms-excel')
-        response['Content-Disposition'] = 'attachment; filename="debit_accounts.xls"'
-        
-        wb = xlwt.Workbook(encoding='utf-8')
-        ws = wb.add_sheet('Debit Accounts')
-        
-        row_num = 0
-        columns = ['Account Number', 'Account Name', 'Description', 'Status', 'Created At']
-        
-        for col_num, column_title in enumerate(columns):
-            ws.write(row_num, col_num, column_title)
-        
-        for account in accounts:
-            row_num += 1
-            ws.write(row_num, 0, account.account_number)
-            ws.write(row_num, 1, account.account_name)
-            ws.write(row_num, 2, account.description or '')
-            ws.write(row_num, 3, 'Active' if account.is_active else 'Inactive')
-            ws.write(row_num, 4, account.created_at.strftime('%Y-%m-%d') if account.created_at else 'N/A')
-        
-        wb.save(response)
-        return response
-    
     return redirect('debit_account_list')
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def debit_account_bulk_activate(request):
-    """Bulk activate debit accounts"""
     account_ids = request.POST.getlist('account_ids')
     DebitAccount.objects.filter(id__in=account_ids).update(is_active=True)
-    
     messages.success(request, f'{len(account_ids)} debit account(s) activated successfully')
-    next_url = request.POST.get('next', 'debit_account_list')
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'debit_account_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def debit_account_bulk_deactivate(request):
-    """Bulk deactivate debit accounts"""
     account_ids = request.POST.getlist('account_ids')
     DebitAccount.objects.filter(id__in=account_ids).update(is_active=False)
-    
     messages.success(request, f'{len(account_ids)} debit account(s) deactivated successfully')
-    next_url = request.POST.get('next', 'debit_account_list')
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'debit_account_list'))
 
 @login_required
 @user_passes_test(is_system_admin)
 @require_POST
 def debit_account_bulk_delete(request):
-    """Bulk delete debit accounts"""
     account_ids = request.POST.getlist('account_ids')
-    accounts = DebitAccount.objects.filter(id__in=account_ids)
-    
-    count = accounts.count()
-    accounts.delete()
+    count = DebitAccount.objects.filter(id__in=account_ids).delete()[0]
     messages.success(request, f'{count} debit account(s) deleted successfully')
-    
-    next_url = request.POST.get('next', 'debit_account_list')
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'debit_account_list'))
 
 # ================ ACCOUNTS PERSONNEL VIEWS ================
-
-def is_accounts_personnel(user):
-    """Check if user is accounts personnel"""
-    return user.groups.filter(name='Accounts Personnel').exists()
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 def accounts_dashboard(request):
-    """Accounts Personnel Dashboard"""
     user = request.user
-    
     batches = EFTBatch.objects.filter(created_by=user)
-    
+    pending_fm = batches.filter(status='PENDING_FM').count()
+    pending_dir = batches.filter(status='PENDING_DIRECTOR').count()
     stats = {
         'total_batches': batches.count(),
         'draft_batches': batches.filter(status='DRAFT').count(),
-        'pending_batches': batches.filter(status__in=['PENDING_FM', 'PENDING_DIRECTOR']).count(),
-        'approved_batches': batches.filter(status='APPROVED').count(),
+        'pending_batches': pending_fm + pending_dir,
+        'pending_fm_batches': pending_fm,
+        'pending_director_batches': pending_dir,
+        'approved_batches': batches.filter(status__in=['APPROVED', 'EXPORTED']).count(),
         'rejected_batches': batches.filter(status='REJECTED').count(),
-        'total_amount': batches.filter(status='APPROVED').aggregate(Sum('total_amount'))['total_amount__sum'] or 0,
+        'exported_batches': batches.filter(status='EXPORTED').count(),
+        'total_amount': batches.filter(status__in=['APPROVED', 'EXPORTED']).aggregate(Sum('total_amount'))['total_amount__sum'] or 0,
     }
-    
-    recent_batches = batches.order_by('-created_at')[:5]
-    
-    return render(request, 'accounts/dashboard.html', {
-        'stats': stats,
-        'recent_batches': recent_batches
-    })
+    recent_batches = batches.order_by('-created_at')[:10]
+    return render(request, 'accounts/dashboard.html', {'stats': stats, 'recent_batches': recent_batches})
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 def batch_list(request):
-    """List all batches for accounts personnel with search and filter"""
     batches = EFTBatch.objects.filter(created_by=request.user).order_by('-created_at')
-    
     status_filter = request.GET.get('status', '')
     if status_filter:
         batches = batches.filter(status=status_filter)
-    
-    search_query = request.GET.get('search')
-    if search_query:
-        batches = batches.filter(
-            Q(batch_reference__icontains=search_query) |
-            Q(batch_name__icontains=search_query)
-        )
-    
+    search = request.GET.get('search')
+    if search:
+        batches = batches.filter(Q(batch_reference__icontains=search) | Q(batch_name__icontains=search))
     total_batches = batches.count()
-    total_amount = batches.aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0')
-    total_records = batches.aggregate(Sum('record_count'))['record_count__sum'] or 0
-    avg_batch_size = batches.aggregate(Avg('record_count'))['record_count__avg'] or 0
-    
+    total_amount = batches.filter(status__in=['APPROVED', 'EXPORTED']).aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0')
     draft_count = EFTBatch.objects.filter(created_by=request.user, status='DRAFT').count()
-    pending_count = EFTBatch.objects.filter(created_by=request.user, status__in=['PENDING_FM', 'PENDING_DIRECTOR']).count()
-    approved_count = EFTBatch.objects.filter(created_by=request.user, status='APPROVED').count()
+    pending_fm = EFTBatch.objects.filter(created_by=request.user, status='PENDING_FM').count()
+    pending_dir = EFTBatch.objects.filter(created_by=request.user, status='PENDING_DIRECTOR').count()
+    approved_count = EFTBatch.objects.filter(created_by=request.user, status__in=['APPROVED', 'EXPORTED']).count()
     rejected_count = EFTBatch.objects.filter(created_by=request.user, status='REJECTED').count()
-    
-    can_delete_any = batches.filter(status='DRAFT').exists()
-    
     paginator = Paginator(batches, 20)
-    page_number = request.GET.get('page')
+    page = request.GET.get('page')
     try:
-        page_obj = paginator.page(page_number)
-    except PageNotAnInteger:
+        page_obj = paginator.page(page)
+    except:
         page_obj = paginator.page(1)
-    except EmptyPage:
-        page_obj = paginator.page(paginator.num_pages)
-    
     context = {
-        'batches': page_obj,
-        'page_obj': page_obj,
-        'is_paginated': paginator.num_pages > 1,
-        'status_filter': status_filter,
-        'total_count': total_batches,
-        'total_batches': total_batches,
-        'total_amount': total_amount,
-        'total_records': total_records,
-        'avg_batch_size': avg_batch_size,
-        'draft_count': draft_count,
-        'pending_count': pending_count,
-        'approved_count': approved_count,
-        'rejected_count': rejected_count,
-        'can_delete_any': can_delete_any,
+        'batches': page_obj, 'page_obj': page_obj, 'status_filter': status_filter,
+        'total_batches': total_batches, 'total_amount': total_amount,
+        'draft_count': draft_count, 'pending_fm_count': pending_fm,
+        'pending_director_count': pending_dir, 'pending_count': pending_fm + pending_dir,
+        'approved_count': approved_count, 'rejected_count': rejected_count,
+        'can_delete_any': batches.filter(status='DRAFT').exists(),
     }
-    
     return render(request, 'accounts/batch_list.html', context)
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 def create_batch(request):
-    """Create new EFT batch"""
     if request.method == 'POST':
         form = EFTBatchForm(request.POST)
         if form.is_valid():
-            with db_transaction.atomic():
-                batch = form.save(commit=False)
-                batch.created_by = request.user
-                batch.batch_reference = f"CRWB-{timezone.now().strftime('%Y%m%d-%H%M%S')}"
-                batch.save()
-                
-                messages.success(request, 'EFT batch created successfully')
-                return redirect('edit_batch', batch_id=batch.id)
+            batch = form.save(commit=False)
+            batch.created_by = request.user
+            batch.save()
+            messages.success(request, mark_safe(
+                f'EFT batch created.<br>Reference: <code>{batch.batch_reference}</code><br>'
+                f'Export as: <code>{batch.get_obdx_filename()}</code>'
+            ))
+            return redirect('edit_batch', batch_id=batch.id)
     else:
         form = EFTBatchForm()
-    
     return render(request, 'accounts/create_batch.html', {'form': form})
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 def edit_batch(request, batch_id):
-    """Edit EFT batch (only in DRAFT status)"""
     batch = get_object_or_404(EFTBatch, id=batch_id, created_by=request.user)
-    
     if batch.status != 'DRAFT':
         messages.error(request, 'Cannot edit batch that is not in DRAFT status')
         return redirect('accounts_dashboard')
-    
     transactions = batch.transactions.all().order_by('sequence_number')
-    
     if request.method == 'POST':
         form = EFTBatchForm(request.POST, instance=batch)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Batch updated successfully')
+            messages.success(request, 'Batch updated')
             return redirect('edit_batch', batch_id=batch.id)
     else:
         form = EFTBatchForm(instance=batch)
-    
-    transaction_form = EFTTransactionForm()
-    
     return render(request, 'accounts/edit_batch.html', {
-        'batch': batch,
-        'transactions': transactions,
-        'form': form,
-        'transaction_form': transaction_form,
+        'batch': batch, 'transactions': transactions, 'form': form,
+        'transaction_form': EFTTransactionForm(),
         'total_amount': sum(t.amount for t in transactions)
     })
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 def add_transaction(request, batch_id):
-    """Add transaction to batch"""
     batch = get_object_or_404(EFTBatch, id=batch_id, created_by=request.user)
-    
     if batch.status != 'DRAFT':
-        return JsonResponse({
-            'success': False,
-            'message': 'Cannot add transactions to batch that is not in DRAFT status'
-        })
-    
+        return JsonResponse({'success': False, 'message': 'Batch not in DRAFT status'})
     if request.method == 'POST':
         form = EFTTransactionForm(request.POST)
         if form.is_valid():
             with db_transaction.atomic():
                 transaction = form.save(commit=False)
                 transaction.batch = batch
-                
                 last_seq = batch.transactions.order_by('sequence_number').last()
-                if last_seq:
-                    next_seq = int(last_seq.sequence_number) + 1
-                else:
-                    next_seq = 1
-                transaction.sequence_number = str(next_seq).zfill(4)
-                
+                transaction.sequence_number = str(int(last_seq.sequence_number) + 1 if last_seq else 1).zfill(4)
                 transaction.zone = transaction.scheme.zone
-                
                 transaction.save()
-                
                 batch.update_totals()
-                
                 return JsonResponse({
-                    'success': True,
-                    'message': 'Transaction added successfully',
-                    'transaction_id': transaction.id,
-                    'sequence_number': transaction.sequence_number,
-                    'amount': str(transaction.amount),
-                    'supplier_name': transaction.supplier.supplier_name,
-                    'batch_total': str(batch.total_amount),
-                    'record_count': batch.record_count
+                    'success': True, 'message': 'Transaction added',
+                    'batch_total': str(batch.total_amount), 'record_count': batch.record_count
                 })
-        else:
-            return JsonResponse({
-                'success': False,
-                'errors': form.errors.get_json_data()
-            })
-    
-    return JsonResponse({'success': False, 'message': 'Invalid request method'})
+        return JsonResponse({'success': False, 'errors': form.errors.get_json_data()})
+    return JsonResponse({'success': False})
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 def delete_transaction(request, batch_id, transaction_id):
-    """Delete transaction from batch"""
     batch = get_object_or_404(EFTBatch, id=batch_id, created_by=request.user)
-    
     if batch.status != 'DRAFT':
-        return JsonResponse({
-            'success': False,
-            'message': 'Cannot delete transactions from batch that is not in DRAFT status'
-        })
-    
+        return JsonResponse({'success': False, 'message': 'Batch not in DRAFT status'})
     transaction = get_object_or_404(EFTTransaction, id=transaction_id, batch=batch)
-    
-    with db_transaction.atomic():
-        transaction.delete()
-        batch.update_totals()
-        
-        transactions = batch.transactions.all().order_by('id')
-        for idx, trans in enumerate(transactions, 1):
-            trans.sequence_number = str(idx).zfill(4)
-            trans.save()
-    
-    return JsonResponse({
-        'success': True,
-        'message': 'Transaction deleted successfully',
-        'batch_total': str(batch.total_amount),
-        'record_count': batch.record_count
-    })
+    transaction.delete()
+    batch.update_totals()
+    for idx, t in enumerate(batch.transactions.all().order_by('id'), 1):
+        t.sequence_number = str(idx).zfill(4)
+        t.save()
+    return JsonResponse({'success': True, 'batch_total': str(batch.total_amount), 'record_count': batch.record_count})
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 def submit_for_approval(request, batch_id):
-    """Submit batch for Finance Manager review (Stage 1 of 2)"""
     batch = get_object_or_404(EFTBatch, id=batch_id, created_by=request.user)
-
     if batch.status != 'DRAFT':
-        messages.error(request, 'Only DRAFT batches can be submitted for approval')
+        messages.error(request, 'Only DRAFT batches can be submitted')
         return redirect('view_batch', batch_id=batch.id)
-
     if batch.transactions.count() == 0:
         messages.error(request, 'Cannot submit empty batch')
         return redirect('edit_batch', batch_id=batch.id)
-
-    with db_transaction.atomic():
-        batch.status = 'PENDING_FM'
-        batch.save()
-
-        ApprovalAuditLog.objects.create(
-            batch=batch,
-            action='SUBMITTED',
-            user=request.user,
-            ip_address=request.META.get('REMOTE_ADDR')
-        )
-
-        messages.success(request, 'Batch submitted to Finance Manager for review.')
-
+    batch.status = 'PENDING_FM'
+    batch.save()
+    ApprovalAuditLog.objects.create(batch=batch, action='SUBMITTED', user=request.user, ip_address=request.META.get('REMOTE_ADDR'))
+    messages.success(request, 'Batch submitted to Finance Manager')
     return redirect('accounts_dashboard')
 
 @login_required
-@user_passes_test(is_accounts_personnel)
 @require_POST
 def delete_batch(request, batch_id):
-    """Delete a draft batch"""
     batch = get_object_or_404(EFTBatch, id=batch_id, created_by=request.user)
-    
     if batch.status != 'DRAFT':
         messages.error(request, 'Only DRAFT batches can be deleted')
         return redirect('batch_list')
-    
-    with db_transaction.atomic():
-        batch_name = batch.batch_name
-        batch.delete()
-        messages.success(request, f'Batch "{batch_name}" deleted successfully')
-    
+    batch.delete()
+    messages.success(request, 'Batch deleted')
     return redirect('batch_list')
-
-@login_required
-def view_batch(request, batch_id):
-    """View batch details"""
-    batch = get_object_or_404(EFTBatch, id=batch_id)
-    
-    if not (batch.created_by == request.user or 
-            request.user.has_perm('eft_app.can_approve_eft') or
-            request.user.is_superuser):
-        messages.error(request, 'You do not have permission to view this batch')
-        return redirect('dashboard')
-    
-    transactions = batch.transactions.all().order_by('sequence_number')
-    audit_logs = batch.audit_logs.all().order_by('-timestamp')
-    
-    return render(request, 'accounts/view_batch.html', {
-        'batch': batch,
-        'transactions': transactions,
-        'audit_logs': audit_logs
-    })
-
-@login_required
-def export_batch(request, batch_id, format='txt'):
-    """Export EFT file (only for approved batches)"""
-    batch = get_object_or_404(EFTBatch, id=batch_id)
-    
-    if not (request.user.has_perm('eft_app.can_export_eft') and batch.status == 'APPROVED'):
-        messages.error(request, 'You do not have permission to export this file or batch is not approved')
-        return redirect('view_batch', batch_id=batch.id)
-    
-    try:
-        generator = EFTGenerator()
-        content = generator.generate_eft_file(batch)
-        filename = f"CRWB_EFT_{batch.batch_reference}_{timezone.now().strftime('%Y%m%d_%H%M%S')}"
-        
-        if format == 'csv':
-            response = generator.export_to_csv(content, filename)
-        else:
-            response = generator.export_to_txt(content, filename)
-        
-        ApprovalAuditLog.objects.create(
-            batch=batch,
-            action='EXPORTED',
-            user=request.user,
-            remarks=f'Exported as {format.upper()}',
-            ip_address=request.META.get('REMOTE_ADDR')
-        )
-        
-        return response
-        
-    except Exception as e:
-        messages.error(request, f'Error generating file: {str(e)}')
-        return redirect('view_batch', batch_id=batch.id)
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 def export_batch_details(request, batch_id):
-    """Export batch details as PDF"""
     return redirect('export_batch', batch_id=batch_id, format='csv')
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 def batch_export_all(request):
-    """Export all batches for the current user"""
     format = request.GET.get('format', 'csv')
     batches = EFTBatch.objects.filter(created_by=request.user).order_by('-created_at')
-    
     if format == 'csv':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="my_batches.csv"'
-        
         writer = csv.writer(response)
-        writer.writerow(['Batch Reference', 'Batch Name', 'Status', 'Records', 'Total Amount (MWK)', 'Created', 'Last Updated'])
-        
+        writer.writerow(['Batch Reference', 'Batch Name', 'File Type', 'Status', 'Records', 'Total Amount (MWK)', 'Created'])
         for batch in batches:
             writer.writerow([
-                batch.batch_reference,
-                batch.batch_name,
-                batch.get_status_display(),
-                batch.record_count,
-                str(batch.total_amount),
-                batch.created_at.strftime('%Y-%m-%d'),
-                batch.updated_at.strftime('%Y-%m-%d %H:%M')
+                batch.batch_reference, batch.batch_name, batch.get_file_type_display(),
+                batch.get_status_display(), batch.record_count, str(batch.total_amount),
+                batch.created_at.strftime('%Y-%m-%d')
             ])
-        
         return response
-    
-    elif format == 'excel':
-        response = HttpResponse(content_type='application/ms-excel')
-        response['Content-Disposition'] = 'attachment; filename="my_batches.xls"'
-        
-        wb = xlwt.Workbook(encoding='utf-8')
-        ws = wb.add_sheet('My Batches')
-        
-        row_num = 0
-        columns = ['Batch Reference', 'Batch Name', 'Status', 'Records', 'Total Amount (MWK)', 'Created', 'Last Updated']
-        
-        for col_num, column_title in enumerate(columns):
-            ws.write(row_num, col_num, column_title)
-        
-        for batch in batches:
-            row_num += 1
-            ws.write(row_num, 0, batch.batch_reference)
-            ws.write(row_num, 1, batch.batch_name)
-            ws.write(row_num, 2, batch.get_status_display())
-            ws.write(row_num, 3, batch.record_count)
-            ws.write(row_num, 4, str(batch.total_amount))
-            ws.write(row_num, 5, batch.created_at.strftime('%Y-%m-%d'))
-            ws.write(row_num, 6, batch.updated_at.strftime('%Y-%m-%d %H:%M'))
-        
-        wb.save(response)
-        return response
-    
     return redirect('batch_list')
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 def batch_export_selected(request):
-    """Export selected batches"""
-    format = request.GET.get('format', 'csv')
     batch_ids = request.GET.getlist('batch_ids')
-    
     if not batch_ids:
-        messages.error(request, 'No batches selected for export')
+        messages.error(request, 'No batches selected')
         return redirect('batch_list')
-    
+    format = request.GET.get('format', 'csv')
     batches = EFTBatch.objects.filter(id__in=batch_ids, created_by=request.user).order_by('-created_at')
-    
     if format == 'csv':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="selected_batches.csv"'
-        
         writer = csv.writer(response)
-        writer.writerow(['Batch Reference', 'Batch Name', 'Status', 'Records', 'Total Amount (MWK)', 'Created', 'Last Updated'])
-        
+        writer.writerow(['Batch Reference', 'Batch Name', 'File Type', 'Status', 'Records', 'Total Amount (MWK)', 'Created'])
         for batch in batches:
             writer.writerow([
-                batch.batch_reference,
-                batch.batch_name,
-                batch.get_status_display(),
-                batch.record_count,
-                str(batch.total_amount),
-                batch.created_at.strftime('%Y-%m-%d'),
-                batch.updated_at.strftime('%Y-%m-%d %H:%M')
+                batch.batch_reference, batch.batch_name, batch.get_file_type_display(),
+                batch.get_status_display(), batch.record_count, str(batch.total_amount),
+                batch.created_at.strftime('%Y-%m-%d')
             ])
-        
         return response
-    
-    elif format == 'excel':
-        response = HttpResponse(content_type='application/ms-excel')
-        response['Content-Disposition'] = 'attachment; filename="selected_batches.xls"'
-        
-        wb = xlwt.Workbook(encoding='utf-8')
-        ws = wb.add_sheet('Selected Batches')
-        
-        row_num = 0
-        columns = ['Batch Reference', 'Batch Name', 'Status', 'Records', 'Total Amount (MWK)', 'Created', 'Last Updated']
-        
-        for col_num, column_title in enumerate(columns):
-            ws.write(row_num, col_num, column_title)
-        
-        for batch in batches:
-            row_num += 1
-            ws.write(row_num, 0, batch.batch_reference)
-            ws.write(row_num, 1, batch.batch_name)
-            ws.write(row_num, 2, batch.get_status_display())
-            ws.write(row_num, 3, batch.record_count)
-            ws.write(row_num, 4, str(batch.total_amount))
-            ws.write(row_num, 5, batch.created_at.strftime('%Y-%m-%d'))
-            ws.write(row_num, 6, batch.updated_at.strftime('%Y-%m-%d %H:%M'))
-        
-        wb.save(response)
-        return response
-    
     return redirect('batch_list')
 
 @login_required
 @user_passes_test(is_accounts_personnel)
 @require_POST
 def batch_bulk_delete(request):
-    """Bulk delete draft batches"""
     batch_ids = request.POST.getlist('batch_ids')
-    batches = EFTBatch.objects.filter(id__in=batch_ids, created_by=request.user, status='DRAFT')
-    
-    count = batches.count()
-    batches.delete()
-    
+    count = EFTBatch.objects.filter(id__in=batch_ids, created_by=request.user, status='DRAFT').delete()[0]
     messages.success(request, f'{count} draft batch(es) deleted successfully')
-    next_url = request.POST.get('next', 'batch_list')
-    return redirect(next_url)
+    return redirect(request.POST.get('next', 'batch_list'))
 
 # ================ FINANCE MANAGER VIEWS ================
 
-def is_finance_manager(user):
-    return user.groups.filter(name='Finance Manager').exists()
+@login_required
+@user_passes_test(is_finance_manager)
+def fm_dashboard(request):
+    pending = EFTBatch.objects.filter(status='PENDING_FM').order_by('-created_at')
+    recent = EFTBatch.objects.filter(
+        status__in=['PENDING_DIRECTOR', 'APPROVED', 'REJECTED', 'EXPORTED'],
+        fm_reviewed_by=request.user
+    ).order_by('-fm_reviewed_at')[:10]
+    stats = {
+        'pending_count': pending.count(),
+        'forwarded_today': EFTBatch.objects.filter(
+            status='PENDING_DIRECTOR', fm_reviewed_at__date=timezone.now().date(), fm_reviewed_by=request.user
+        ).count(),
+        'total_forwarded': EFTBatch.objects.filter(
+            fm_reviewed_by=request.user, status__in=['PENDING_DIRECTOR', 'APPROVED', 'EXPORTED']
+        ).count(),
+        'total_rejected': EFTBatch.objects.filter(fm_reviewed_by=request.user, status='REJECTED').count(),
+    }
+    return render(request, 'finance_manager/fm_dashboard.html', {'pending_batches': pending, 'recent_batches': recent, 'stats': stats})
 
-def is_director_of_finance(user):
-    return user.groups.filter(name='Director of Finance').exists()
+@login_required
+@user_passes_test(is_finance_manager)
+def fm_batch_list(request):
+    batches = EFTBatch.objects.exclude(status='DRAFT', created_by=request.user).order_by('-created_at')
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        batches = batches.filter(status=status_filter)
+    return render(request, 'finance_manager/batch_list.html', {
+        'batches': batches, 'status_filter': status_filter,
+        'pending_fm_count': EFTBatch.objects.filter(status='PENDING_FM').count()
+    })
+
+@login_required
+@user_passes_test(is_finance_manager)
+def fm_review_batch(request, batch_id):
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_FM')
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot review your own batch')
+        return redirect('fm_dashboard')
+    return render(request, 'finance_manager/review_batch.html', {
+        'batch': batch, 'transactions': batch.transactions.all().order_by('sequence_number'),
+        'audit_logs': batch.audit_logs.all().order_by('timestamp'),
+        'approval_form': BatchApprovalForm(), 'rejection_form': BatchRejectionForm(),
+        'total_amount': sum(t.amount for t in batch.transactions.all())
+    })
+
+@login_required
+@user_passes_test(is_finance_manager)
+def fm_forward_batch(request, batch_id):
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_FM')
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot forward your own batch')
+        return redirect('fm_dashboard')
+    if request.method == 'POST':
+        form = BatchApprovalForm(request.POST)
+        if form.is_valid():
+            batch.status = 'PENDING_DIRECTOR'
+            batch.fm_reviewed_by = request.user
+            batch.fm_reviewed_at = timezone.now()
+            batch.fm_remarks = form.cleaned_data.get('remarks', '')
+            batch.save()
+            ApprovalAuditLog.objects.create(batch=batch, action='FM_REVIEWED', user=request.user, remarks=batch.fm_remarks)
+            messages.success(request, 'Batch forwarded to Director')
+            return redirect('fm_dashboard')
+    return redirect('fm_review_batch', batch_id=batch_id)
+
+@login_required
+@user_passes_test(is_finance_manager)
+def fm_reject_batch(request, batch_id):
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_FM')
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot reject your own batch')
+        return redirect('fm_dashboard')
+    if request.method == 'POST':
+        form = BatchRejectionForm(request.POST)
+        if form.is_valid():
+            batch.status = 'REJECTED'
+            batch.rejection_reason = form.cleaned_data['rejection_reason']
+            batch.fm_reviewed_by = request.user
+            batch.fm_reviewed_at = timezone.now()
+            batch.save()
+            ApprovalAuditLog.objects.create(batch=batch, action='FM_REJECTED', user=request.user, remarks=batch.rejection_reason)
+            messages.success(request, 'Batch rejected')
+            return redirect('fm_dashboard')
+    return redirect('fm_review_batch', batch_id=batch_id)
+
+# ================ DIRECTOR OF FINANCE VIEWS ================
+
+@login_required
+@user_passes_test(is_director_of_finance)
+def director_dashboard(request):
+    pending = EFTBatch.objects.filter(status='PENDING_DIRECTOR').order_by('-created_at')
+    recent = EFTBatch.objects.filter(
+        status__in=['APPROVED', 'REJECTED', 'EXPORTED'], approved_by=request.user
+    ).order_by('-approved_at')[:10]
+    stats = {
+        'pending_count': pending.count(),
+        'approved_today': EFTBatch.objects.filter(
+            status__in=['APPROVED', 'EXPORTED'], approved_at__date=timezone.now().date(), approved_by=request.user
+        ).count(),
+        'total_approved': EFTBatch.objects.filter(approved_by=request.user, status__in=['APPROVED', 'EXPORTED']).count(),
+        'total_rejected': EFTBatch.objects.filter(approved_by=request.user, status='REJECTED').count(),
+    }
+    return render(request, 'director/director_dashboard.html', {'pending_batches': pending, 'recent_approvals': recent, 'stats': stats})
+
+@login_required
+@user_passes_test(is_director_of_finance)
+def director_batch_list(request):
+    batches = EFTBatch.objects.exclude(status='DRAFT', created_by=request.user).order_by('-created_at')
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        batches = batches.filter(status=status_filter)
+    return render(request, 'director/batch_list.html', {
+        'batches': batches, 'status_filter': status_filter,
+        'pending_count': EFTBatch.objects.filter(status='PENDING_DIRECTOR').count()
+    })
+
+@login_required
+@user_passes_test(is_director_of_finance)
+def director_review_batch(request, batch_id):
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_DIRECTOR')
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot approve your own batch')
+        return redirect('director_dashboard')
+    return render(request, 'director/review_batch.html', {
+        'batch': batch, 'transactions': batch.transactions.all().order_by('sequence_number'),
+        'audit_logs': batch.audit_logs.all().order_by('timestamp'),
+        'approval_form': BatchApprovalForm(), 'rejection_form': BatchRejectionForm(),
+        'total_amount': sum(t.amount for t in batch.transactions.all())
+    })
+
+@login_required
+@user_passes_test(is_director_of_finance)
+def director_approve_batch(request, batch_id):
+    batch = get_object_or_404(EFTBatch, id=batch_id)
+    
+    if batch.status != 'PENDING_DIRECTOR':
+        messages.error(request, f'Batch is not pending director approval. Current status: {batch.get_status_display()}')
+        return redirect('director_dashboard')
+    
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot approve your own batch')
+        return redirect('director_dashboard')
+    
+    if request.method == 'POST':
+        form = BatchApprovalForm(request.POST)
+        if form.is_valid():
+            batch.status = 'APPROVED'
+            batch.approved_by = request.user
+            batch.approved_at = timezone.now()
+            batch.remarks = form.cleaned_data.get('remarks', '')
+            batch.save()
+
+            ApprovalAuditLog.objects.create(
+                batch=batch, action='APPROVED', user=request.user,
+                remarks=form.cleaned_data.get('remarks', ''),
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+            
+            messages.success(request, mark_safe(
+                f'Batch approved!<br>Ready for export as: <code>{batch.get_obdx_filename()}</code>'
+            ))
+            return redirect('director_dashboard')
+    
+    return redirect('director_review_batch', batch_id=batch_id)
+
+@login_required
+@user_passes_test(is_director_of_finance)
+def director_reject_batch(request, batch_id):
+    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_DIRECTOR')
+    if batch.created_by == request.user:
+        messages.error(request, 'You cannot reject your own batch')
+        return redirect('director_dashboard')
+    if request.method == 'POST':
+        form = BatchRejectionForm(request.POST)
+        if form.is_valid():
+            batch.status = 'REJECTED'
+            batch.rejection_reason = form.cleaned_data['rejection_reason']
+            batch.approved_by = request.user
+            batch.approved_at = timezone.now()
+            batch.save()
+            ApprovalAuditLog.objects.create(batch=batch, action='REJECTED', user=request.user, remarks=batch.rejection_reason)
+            messages.success(request, 'Batch rejected')
+            return redirect('director_dashboard')
+    return redirect('director_review_batch', batch_id=batch_id)
+
+# ================ LEGACY AUTHORIZER VIEWS ================
 
 @login_required
 def authorizer_dashboard(request):
-    # Legacy URL — redirect to appropriate new dashboard
     if request.user.groups.filter(name='Finance Manager').exists():
         return redirect('fm_dashboard')
     if request.user.groups.filter(name='Director of Finance').exists():
         return redirect('director_dashboard')
     return redirect('dashboard')
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# STAGE 1 — Finance Manager
-# ──────────────────────────────────────────────────────────────────────────────
-
-@login_required
-@user_passes_test(is_finance_manager)
-def fm_dashboard(request):
-    """Finance Manager Dashboard"""
-    pending_batches = EFTBatch.objects.filter(status='PENDING_FM').order_by('-created_at')
-
-    recent = EFTBatch.objects.filter(
-        status__in=['PENDING_DIRECTOR', 'APPROVED', 'REJECTED'],
-        fm_reviewed_by=request.user
-    ).order_by('-fm_reviewed_at')[:10]
-
-    stats = {
-        'pending_count': pending_batches.count(),
-        'forwarded_today': EFTBatch.objects.filter(
-            status='PENDING_DIRECTOR',
-            fm_reviewed_at__date=timezone.now().date(),
-            fm_reviewed_by=request.user
-        ).count(),
-        'total_forwarded': EFTBatch.objects.filter(
-            fm_reviewed_by=request.user,
-            status__in=['PENDING_DIRECTOR', 'APPROVED']
-        ).count(),
-        'total_rejected': EFTBatch.objects.filter(
-            fm_reviewed_by=request.user,
-            status='REJECTED'
-        ).count(),
-    }
-
-    return render(request, 'finance_manager/fm_dashboard.html', {
-        'pending_batches': pending_batches,
-        'recent_batches': recent,
-        'stats': stats
-    })
-
-
-@login_required
-@user_passes_test(is_finance_manager)
-def fm_batch_list(request):
-    batches = EFTBatch.objects.exclude(
-        Q(status='DRAFT', created_by=request.user)
-    ).order_by('-created_at')
-    status_filter = request.GET.get('status', '')
-    if status_filter:
-        batches = batches.filter(status=status_filter)
-    return render(request, 'finance_manager/batch_list.html', {
-        'batches': batches,
-        'status_filter': status_filter
-    })
-
-
-@login_required
-@user_passes_test(is_finance_manager)
-def fm_review_batch(request, batch_id):
-    """Finance Manager reviews a batch — can forward or reject"""
-    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_FM')
-
-    if batch.created_by == request.user:
-        messages.error(request, 'You cannot review your own batch')
-        return redirect('fm_dashboard')
-
-    transactions = batch.transactions.all().order_by('sequence_number')
-    audit_logs = batch.audit_logs.all().order_by('timestamp')
-    approval_form = BatchApprovalForm()
-    rejection_form = BatchRejectionForm()
-
-    return render(request, 'finance_manager/review_batch.html', {
-        'batch': batch,
-        'transactions': transactions,
-        'audit_logs': audit_logs,
-        'approval_form': approval_form,
-        'rejection_form': rejection_form,
-        'total_amount': sum(t.amount for t in transactions),
-    })
-
-
-@login_required
-@user_passes_test(is_finance_manager)
-def fm_forward_batch(request, batch_id):
-    """Finance Manager forwards batch to Director of Finance"""
-    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_FM')
-
-    if batch.created_by == request.user:
-        messages.error(request, 'You cannot forward your own batch')
-        return redirect('fm_dashboard')
-
-    if request.method == 'POST':
-        form = BatchApprovalForm(request.POST)
-        if form.is_valid():
-            with db_transaction.atomic():
-                batch.status = 'PENDING_DIRECTOR'
-                batch.fm_reviewed_by = request.user
-                batch.fm_reviewed_at = timezone.now()
-                batch.fm_remarks = form.cleaned_data.get('remarks', '')
-                batch.save()
-
-                ApprovalAuditLog.objects.create(
-                    batch=batch,
-                    action='FM_REVIEWED',
-                    user=request.user,
-                    remarks=batch.fm_remarks,
-                    ip_address=request.META.get('REMOTE_ADDR')
-                )
-
-                messages.success(request, 'Batch forwarded to Director of Finance for final approval.')
-                return redirect('fm_dashboard')
-
-    messages.error(request, 'Invalid request')
-    return redirect('fm_review_batch', batch_id=batch_id)
-
-
-@login_required
-@user_passes_test(is_finance_manager)
-def fm_reject_batch(request, batch_id):
-    """Finance Manager rejects a batch"""
-    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_FM')
-
-    if batch.created_by == request.user:
-        messages.error(request, 'You cannot reject your own batch')
-        return redirect('fm_dashboard')
-
-    if request.method == 'POST':
-        form = BatchRejectionForm(request.POST)
-        if form.is_valid():
-            with db_transaction.atomic():
-                batch.status = 'REJECTED'
-                batch.rejection_reason = form.cleaned_data['rejection_reason']
-                batch.fm_reviewed_by = request.user
-                batch.fm_reviewed_at = timezone.now()
-                batch.save()
-
-                ApprovalAuditLog.objects.create(
-                    batch=batch,
-                    action='FM_REJECTED',
-                    user=request.user,
-                    remarks=form.cleaned_data['rejection_reason'],
-                    ip_address=request.META.get('REMOTE_ADDR')
-                )
-
-                messages.success(request, 'Batch rejected.')
-                return redirect('fm_dashboard')
-
-    messages.error(request, 'Invalid request')
-    return redirect('fm_review_batch', batch_id=batch_id)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# STAGE 2 — Director of Finance
-# ──────────────────────────────────────────────────────────────────────────────
-
-@login_required
-@user_passes_test(is_director_of_finance)
-def director_dashboard(request):
-    """Director of Finance Dashboard"""
-    pending_batches = EFTBatch.objects.filter(status='PENDING_DIRECTOR').order_by('-created_at')
-
-    recent = EFTBatch.objects.filter(
-        status__in=['APPROVED', 'REJECTED'],
-        approved_by=request.user
-    ).order_by('-approved_at')[:10]
-
-    stats = {
-        'pending_count': pending_batches.count(),
-        'approved_today': EFTBatch.objects.filter(
-            status='APPROVED',
-            approved_at__date=timezone.now().date(),
-            approved_by=request.user
-        ).count(),
-        'total_approved': EFTBatch.objects.filter(approved_by=request.user, status='APPROVED').count(),
-        'total_rejected': EFTBatch.objects.filter(approved_by=request.user, status='REJECTED').count(),
-    }
-
-    return render(request, 'director/director_dashboard.html', {
-        'pending_batches': pending_batches,
-        'recent_approvals': recent,
-        'stats': stats
-    })
-
-
-@login_required
-@user_passes_test(is_director_of_finance)
-def director_batch_list(request):
-    batches = EFTBatch.objects.exclude(
-        Q(status='DRAFT', created_by=request.user)
-    ).order_by('-created_at')
-    status_filter = request.GET.get('status', '')
-    if status_filter:
-        batches = batches.filter(status=status_filter)
-    return render(request, 'director/batch_list.html', {
-        'batches': batches,
-        'status_filter': status_filter
-    })
-
-
-@login_required
-@user_passes_test(is_director_of_finance)
-def director_review_batch(request, batch_id):
-    """Director of Finance reviews a batch forwarded by Finance Manager"""
-    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_DIRECTOR')
-
-    if batch.created_by == request.user:
-        messages.error(request, 'You cannot approve your own batch')
-        return redirect('director_dashboard')
-
-    transactions = batch.transactions.all().order_by('sequence_number')
-    audit_logs = batch.audit_logs.all().order_by('timestamp')
-    approval_form = BatchApprovalForm()
-    rejection_form = BatchRejectionForm()
-
-    return render(request, 'director/review_batch.html', {
-        'batch': batch,
-        'transactions': transactions,
-        'audit_logs': audit_logs,
-        'approval_form': approval_form,
-        'rejection_form': rejection_form,
-        'total_amount': sum(t.amount for t in transactions),
-    })
-
-
-@login_required
-@user_passes_test(is_director_of_finance)
-def director_approve_batch(request, batch_id):
-    """Director of Finance gives final approval"""
-    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_DIRECTOR')
-
-    if batch.created_by == request.user:
-        messages.error(request, 'You cannot approve your own batch')
-        return redirect('director_dashboard')
-
-    if request.method == 'POST':
-        form = BatchApprovalForm(request.POST)
-        if form.is_valid():
-            with db_transaction.atomic():
-                batch.status = 'APPROVED'
-                batch.approved_by = request.user
-                batch.approved_at = timezone.now()
-                batch.save()
-
-                ApprovalAuditLog.objects.create(
-                    batch=batch,
-                    action='APPROVED',
-                    user=request.user,
-                    remarks=form.cleaned_data.get('remarks', ''),
-                    ip_address=request.META.get('REMOTE_ADDR')
-                )
-
-                messages.success(request, 'Batch approved successfully. Ready for export.')
-                return redirect('director_dashboard')
-
-    messages.error(request, 'Invalid request')
-    return redirect('director_review_batch', batch_id=batch_id)
-
-
-@login_required
-@user_passes_test(is_director_of_finance)
-def director_reject_batch(request, batch_id):
-    """Director of Finance rejects a batch"""
-    batch = get_object_or_404(EFTBatch, id=batch_id, status='PENDING_DIRECTOR')
-
-    if batch.created_by == request.user:
-        messages.error(request, 'You cannot reject your own batch')
-        return redirect('director_dashboard')
-
-    if request.method == 'POST':
-        form = BatchRejectionForm(request.POST)
-        if form.is_valid():
-            with db_transaction.atomic():
-                batch.status = 'REJECTED'
-                batch.rejection_reason = form.cleaned_data['rejection_reason']
-                batch.save()
-
-                ApprovalAuditLog.objects.create(
-                    batch=batch,
-                    action='REJECTED',
-                    user=request.user,
-                    remarks=form.cleaned_data['rejection_reason'],
-                    ip_address=request.META.get('REMOTE_ADDR')
-                )
-
-                messages.success(request, 'Batch rejected.')
-                return redirect('director_dashboard')
-
-    messages.error(request, 'Invalid request')
-    return redirect('director_review_batch', batch_id=batch_id)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Legacy authorizer views (kept for backward compatibility)
-# ──────────────────────────────────────────────────────────────────────────────
-
 @login_required
 def authorizer_batch_list(request):
-    batches = EFTBatch.objects.exclude(
-        Q(status='DRAFT', created_by=request.user)
-    ).order_by('-created_at')
-    status_filter = request.GET.get('status', '')
-    if status_filter:
-        batches = batches.filter(status=status_filter)
-    return render(request, 'authorizer/batch_list.html', {
-        'batches': batches,
-        'status_filter': status_filter
-    })
-
+    batches = EFTBatch.objects.exclude(status='DRAFT', created_by=request.user).order_by('-created_at')
+    return render(request, 'authorizer/batch_list.html', {'batches': batches})
 
 @login_required
 def review_batch(request, batch_id):
@@ -2533,19 +1795,11 @@ def review_batch(request, batch_id):
     if batch.created_by == request.user:
         messages.error(request, 'You cannot review your own batch')
         return redirect('authorizer_dashboard')
-    transactions = batch.transactions.all().order_by('sequence_number')
-    audit_logs = batch.audit_logs.all().order_by('timestamp')
-    approval_form = BatchApprovalForm()
-    rejection_form = BatchRejectionForm()
     return render(request, 'authorizer/review_batch.html', {
         'batch': batch,
-        'transactions': transactions,
-        'audit_logs': audit_logs,
-        'approval_form': approval_form,
-        'rejection_form': rejection_form,
-        'total_amount': sum(t.amount for t in transactions),
+        'transactions': batch.transactions.all().order_by('sequence_number'),
+        'total_amount': sum(t.amount for t in batch.transactions.all())
     })
-
 
 @login_required
 def approve_batch(request, batch_id):
@@ -2554,35 +1808,19 @@ def approve_batch(request, batch_id):
         messages.error(request, 'You cannot approve your own batch')
         return redirect('authorizer_dashboard')
     if request.method == 'POST':
-        form = BatchApprovalForm(request.POST)
-        if form.is_valid():
-            with db_transaction.atomic():
-                if batch.status == 'PENDING_FM':
-                    batch.status = 'PENDING_DIRECTOR'
-                    batch.fm_reviewed_by = request.user
-                    batch.fm_reviewed_at = timezone.now()
-                    batch.fm_remarks = form.cleaned_data.get('remarks', '')
-                    batch.save()
-                    ApprovalAuditLog.objects.create(
-                        batch=batch, action='FM_REVIEWED', user=request.user,
-                        remarks=batch.fm_remarks, ip_address=request.META.get('REMOTE_ADDR')
-                    )
-                    messages.success(request, 'Batch forwarded to Director of Finance.')
-                else:
-                    batch.status = 'APPROVED'
-                    batch.approved_by = request.user
-                    batch.approved_at = timezone.now()
-                    batch.save()
-                    ApprovalAuditLog.objects.create(
-                        batch=batch, action='APPROVED', user=request.user,
-                        remarks=form.cleaned_data.get('remarks', ''),
-                        ip_address=request.META.get('REMOTE_ADDR')
-                    )
-                    messages.success(request, 'Batch approved successfully.')
-                return redirect('authorizer_dashboard')
-    messages.error(request, 'Invalid request')
+        if batch.status == 'PENDING_FM':
+            batch.status = 'PENDING_DIRECTOR'
+            batch.fm_reviewed_by = request.user
+            batch.fm_reviewed_at = timezone.now()
+            messages.success(request, 'Batch forwarded to Director')
+        else:
+            batch.status = 'APPROVED'
+            batch.approved_by = request.user
+            batch.approved_at = timezone.now()
+            messages.success(request, 'Batch approved')
+        batch.save()
+        return redirect('authorizer_dashboard')
     return redirect('review_batch', batch_id=batch_id)
-
 
 @login_required
 def reject_batch(request, batch_id):
@@ -2591,96 +1829,54 @@ def reject_batch(request, batch_id):
         messages.error(request, 'You cannot reject your own batch')
         return redirect('authorizer_dashboard')
     if request.method == 'POST':
-        form = BatchRejectionForm(request.POST)
-        if form.is_valid():
-            with db_transaction.atomic():
-                batch.status = 'REJECTED'
-                batch.rejection_reason = form.cleaned_data['rejection_reason']
-                batch.save()
-                ApprovalAuditLog.objects.create(
-                    batch=batch, action='REJECTED', user=request.user,
-                    remarks=form.cleaned_data['rejection_reason'],
-                    ip_address=request.META.get('REMOTE_ADDR')
-                )
-                messages.success(request, 'Batch rejected.')
-                return redirect('authorizer_dashboard')
-    messages.error(request, 'Invalid request')
+        batch.status = 'REJECTED'
+        batch.rejection_reason = request.POST.get('rejection_reason', '')
+        batch.save()
+        messages.success(request, 'Batch rejected')
+        return redirect('authorizer_dashboard')
     return redirect('review_batch', batch_id=batch_id)
-
 
 # ================ API VIEWS ================
 
 @login_required
 def get_supplier_details(request, supplier_id):
-    """Get supplier details for AJAX"""
     try:
         supplier = Supplier.objects.get(id=supplier_id)
-        
-        data = {
+        return JsonResponse({
             'bank_name': supplier.bank.bank_name if supplier.bank else '',
             'swift_code': supplier.bank.swift_code if supplier.bank else '',
             'account_number': supplier.account_number,
             'account_name': supplier.account_name,
-            'credit_reference': supplier.credit_reference or '',
-            'cost_center': supplier.cost_center or '',
-        }
-        
-        return JsonResponse(data)
+        })
     except Supplier.DoesNotExist:
         return JsonResponse({'error': 'Supplier not found'}, status=404)
 
 @login_required
 def get_scheme_zone(request, scheme_id):
-    """Get zone for a scheme - BACKWARD COMPATIBILITY"""
     try:
-        # First try to convert to integer (if it's an ID)
         try:
-            scheme_id_int = int(scheme_id)
-            scheme = Scheme.objects.get(id=scheme_id_int)
+            scheme = Scheme.objects.get(id=int(scheme_id))
         except (ValueError, Scheme.DoesNotExist):
-            # If not found by ID, try to find by scheme_code
             scheme = Scheme.objects.get(scheme_code=scheme_id)
-        
-        data = {
+        return JsonResponse({
             'zone_code': scheme.zone.zone_code if scheme.zone else '',
             'zone_name': scheme.zone.zone_name if scheme.zone else '',
-        }
-        return JsonResponse(data)
+        })
     except Scheme.DoesNotExist:
         return JsonResponse({'error': 'Scheme not found'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
 
-# NEW API ENDPOINT FOR AUTO-COST CENTER
 @login_required
 def get_scheme_details(request, scheme_id):
-    """Get scheme details including default cost center"""
     try:
-        # First try to convert to integer (if it's an ID)
         try:
-            scheme_id_int = int(scheme_id)
-            scheme = Scheme.objects.get(id=scheme_id_int)
+            scheme = Scheme.objects.get(id=int(scheme_id))
         except (ValueError, Scheme.DoesNotExist):
-            # If not found by ID, try to find by scheme_code
             scheme = Scheme.objects.get(scheme_code=scheme_id)
-        
-        data = {
+        return JsonResponse({
             'success': True,
             'zone_code': scheme.zone.zone_code if scheme.zone else '',
             'zone_name': scheme.zone.zone_name if scheme.zone else '',
             'default_cost_center': scheme.default_cost_center or '',
-            'scheme_code': scheme.scheme_code,
-            'scheme_name': scheme.scheme_name,
-        }
-        return JsonResponse(data)
-        
+        })
     except Scheme.DoesNotExist:
-        return JsonResponse({
-            'success': False,
-            'error': f'Scheme not found with ID/code: {scheme_id}'
-        }, status=404)
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': f'Server error: {str(e)}'
-        }, status=500)
+        return JsonResponse({'success': False, 'error': 'Scheme not found'}, status=404)

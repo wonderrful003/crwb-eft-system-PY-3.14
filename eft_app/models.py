@@ -1,12 +1,12 @@
 """
 Models for EFT System - Python 3.14 + Django 5.0.6
 Two-stage approval: Accounts → Finance Manager → Director of Finance
+Updated with OBDX file type support
 """
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, RegexValidator
 from django.utils import timezone
-import uuid
 from django.db.models import Sum, Count
 from django.core.exceptions import ValidationError
 
@@ -31,6 +31,15 @@ class Bank(models.Model):
     @property
     def code(self):
         return self.swift_code[:4] if self.swift_code else ""
+
+    def clean(self):
+        """Validate BIC codes - RBM BICs must end with 0, not W"""
+        super().clean()
+        if self.swift_code:
+            if self.swift_code.startswith('NBMA') and self.swift_code.endswith('W'):
+                raise ValidationError({
+                    'swift_code': f'RBM BIC codes must end with "0", not "W". Please correct to {self.swift_code[:-1]}0'
+                })
 
 
 class Zone(models.Model):
@@ -99,7 +108,7 @@ class DebitAccount(models.Model):
 
 
 class EFTBatch(models.Model):
-    """EFT Batch Header — two-stage approval workflow"""
+    """EFT Batch Header — two-stage approval workflow with OBDX file type support"""
 
     STATUS_CHOICES = [
         ('DRAFT', 'Draft'),
@@ -110,13 +119,30 @@ class EFTBatch(models.Model):
         ('EXPORTED', 'Exported to RBM'),
     ]
 
-    batch_name = models.CharField(max_length=100)
-    batch_reference = models.CharField(max_length=50, unique=True, default=uuid.uuid4)
+    # OBDX File Type Choices
+    FILE_TYPE_CHOICES = [
+        ('OBDXPMN', 'Payment File - Domestic Suppliers'),
+        ('OBDXFX', 'Foreign Payment File - Cross Border'),
+        ('OBDXRM', 'Remittance File - Intra-account Transfers'),
+        ('OBDXRP', 'Remittance with PRN - Tax Payments to MRA'),
+        ('OBDXSF', 'Salary File - Employee Payments'),
+    ]
+
+    batch_name = models.CharField(max_length=100, help_text="Custom part of the OBDX filename (max 50 chars including underscores)")
+    batch_reference = models.CharField(max_length=50, unique=True, blank=True)
     currency = models.CharField(max_length=3, default='MWK')
     total_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0)
     record_count = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
-    file_reference = models.CharField(max_length=16, blank=True)
+    file_reference = models.CharField(max_length=16, blank=True, help_text="RBM File Reference (e.g., WTC01-31.01.2023)")
+    
+    # OBDX File Type
+    file_type = models.CharField(
+        max_length=10, 
+        choices=FILE_TYPE_CHOICES, 
+        default='OBDXPMN',
+        help_text="OBDX file type determines the prefix of the exported file"
+    )
 
     debit_account = models.ForeignKey(DebitAccount, on_delete=models.PROTECT, null=True, blank=True, related_name='batches')
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='batches_created')
@@ -137,6 +163,7 @@ class EFTBatch(models.Model):
         null=True, blank=True, related_name='batches_approved'
     )
     approved_at = models.DateTimeField(null=True, blank=True)
+    remarks = models.TextField(blank=True, help_text="Director's remarks")
     rejection_reason = models.TextField(blank=True)
 
     generated_file = models.TextField(blank=True)
@@ -149,9 +176,16 @@ class EFTBatch(models.Model):
         return f"{self.batch_reference} - {self.batch_name}"
 
     def save(self, *args, **kwargs):
+        # Generate batch reference if not set
+        if not self.batch_reference:
+            now = timezone.now()
+            self.batch_reference = f"CRWB-{now.strftime('%Y%m%d-%H%M%S')}"
+        
+        # Generate file reference if not set
         if not self.file_reference:
-            date_str = timezone.now().strftime('%d.%m.%Y')
-            self.file_reference = f"CRWB-{date_str}"
+            now = timezone.now()
+            self.file_reference = f"CRWB-{now.strftime('%d.%m.%Y')}"
+        
         super().save(*args, **kwargs)
 
     def update_totals(self):
@@ -172,9 +206,49 @@ class EFTBatch(models.Model):
     def can_director_approve(self):
         return self.status == 'PENDING_DIRECTOR'
 
+    def get_party_id(self):
+        """
+        Extract Party ID (first 9 digits) from debit account number.
+        Priority:
+        1. Batch's debit_account (if set)
+        2. First transaction's debit_account (auto-detect)
+        3. Fallback "000000000"
+        """
+        # Priority 1: Try batch's debit account first
+        if self.debit_account and self.debit_account.account_number:
+            account_num = self.debit_account.account_number
+            if len(account_num) >= 9:
+                return account_num[:9]
+        
+        # Priority 2: Try first transaction's debit account
+        first_transaction = self.transactions.first()
+        if first_transaction and first_transaction.debit_account:
+            account_num = first_transaction.debit_account.account_number
+            if account_num and len(account_num) >= 9:
+                return account_num[:9]
+        
+        # Priority 3: Fallback
+        return "000000000"
+
+    def get_obdx_filename(self, extension='txt'):
+        """
+        Generate OBDX-compliant filename:
+        Format: OBDXPMN_PARTYID_DD.MM.YYYYCustomName.ext
+        Example: OBDXPMN_001300616_10.04.2026Salary_Payments.txt
+        """
+        prefix = self.file_type
+        party_id = self.get_party_id()
+        date_str = timezone.now().strftime('%d.%m.%Y')
+        
+        # Sanitize batch name for filename
+        custom_part = self.batch_name.replace(' ', '_').replace('.', '_')[:50]
+        
+        filename = f"{prefix}_{party_id}_{date_str}{custom_part}"
+        return f"{filename}.{extension}"
+
 
 class EFTTransaction(models.Model):
-    """Individual EFT Transaction — RBM Compliant (16-field body record)"""
+    """Individual EFT Transaction — RBM Compliant (17-field body record)"""
     batch = models.ForeignKey(EFTBatch, on_delete=models.CASCADE, related_name='transactions')
     sequence_number = models.CharField(max_length=4)
 
@@ -187,13 +261,13 @@ class EFTTransaction(models.Model):
 
     # RBM Required Fields — matches exact column order in RBM spec
     narration = models.CharField(max_length=200)       # Field 16: Description
-    reference_number = models.CharField(max_length=16) # Field 11: Invoice Number / Payee's Reference
+    reference_number = models.CharField(max_length=16) # Field 10: Invoice Number / Payee's Reference
     source_reference = models.CharField(max_length=18) # Field 15: Source reference (IFMIS)
 
     # Optional Fields
-    employee_number = models.CharField(max_length=6, blank=True)   # Field 9: UDF2
-    national_id = models.CharField(max_length=8, blank=True)       # Field 10: UDF3
-    cost_center = models.CharField(max_length=50, blank=True)      # Field 14: Cost Centre
+    employee_number = models.CharField(max_length=6, blank=True)   # Field 8: UDF2
+    national_id = models.CharField(max_length=8, blank=True)       # Field 9: UDF3
+    cost_center = models.CharField(max_length=50, blank=True)      # Field 13: Cost Centre
 
     created_at = models.DateTimeField(auto_now_add=True)
 

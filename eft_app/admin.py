@@ -20,7 +20,7 @@ class CustomUserAdmin(BaseUserAdmin):
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
 
-# Bank Admin
+# Bank Admin with BIC validation
 @admin.register(Bank)
 class BankAdmin(admin.ModelAdmin):
     list_display = ('bank_name', 'swift_code', 'is_active', 'created_by', 'created_at')
@@ -29,6 +29,11 @@ class BankAdmin(admin.ModelAdmin):
     readonly_fields = ('created_by', 'created_at')
     
     def save_model(self, request, obj, form, change):
+        # Auto-fix RBM BIC codes before saving
+        if obj.swift_code and obj.swift_code.startswith('NBMA') and obj.swift_code.endswith('W'):
+            obj.swift_code = obj.swift_code[:-1] + '0'
+            if not change:
+                messages.info(request, f'RBM BIC code automatically corrected to {obj.swift_code}')
         if not change:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)

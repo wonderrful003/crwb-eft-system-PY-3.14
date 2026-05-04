@@ -1,13 +1,13 @@
-# eft_app/forms.py - COMPLETE FIXED VERSION WITH IMPROVED LABELS
+# eft_app/forms.py - UPDATED WITH OBDX FILE TYPE SUPPORT
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, UserChangeForm
+from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User, Group
 from .models import (
     Bank, Zone, Scheme, Supplier, DebitAccount,
-    EFTBatch, EFTTransaction, ApprovalAuditLog
+    EFTBatch, EFTTransaction
 )
 
-# Updated role choices - Authorizer removed
+# Role choices
 ROLE_CHOICES = [
     ('System Admin', 'System Admin'),
     ('Accounts Personnel', 'Accounts Personnel'),
@@ -24,7 +24,6 @@ class UserRegistrationForm(UserCreationForm):
         widget=forms.Select(attrs={'class': 'form-control'})
     )
     
-    # Add password fields with proper widgets
     password1 = forms.CharField(
         label="Password",
         widget=forms.PasswordInput(attrs={'class': 'form-control'}),
@@ -45,7 +44,6 @@ class UserRegistrationForm(UserCreationForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Make help texts more user-friendly
         self.fields['username'].help_text = "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
         self.fields['email'].help_text = "Enter a valid email address"
     
@@ -65,6 +63,7 @@ class UserRegistrationForm(UserCreationForm):
                     user.is_staff = True
                     user.save()
         return user
+
 
 class UserEditForm(forms.ModelForm):
     role = forms.ChoiceField(
@@ -109,6 +108,7 @@ class UserEditForm(forms.ModelForm):
         
         return user
 
+
 class BankForm(forms.ModelForm):
     class Meta:
         model = Bank
@@ -117,6 +117,10 @@ class BankForm(forms.ModelForm):
             'bank_name': forms.TextInput(attrs={'class': 'form-control'}),
             'swift_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., NBMAMWM0'}),
         }
+        help_texts = {
+            'swift_code': 'RBM BIC codes must end with 0, not W (e.g., NBMAMWM0)'
+        }
+
 
 class ZoneForm(forms.ModelForm):
     class Meta:
@@ -127,6 +131,7 @@ class ZoneForm(forms.ModelForm):
             'zone_name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
+
 
 class SchemeForm(forms.ModelForm):
     class Meta:
@@ -145,6 +150,7 @@ class SchemeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['default_cost_center'].help_text = "Default cost center for this scheme (auto-filled in transactions)"
+
 
 class SupplierForm(forms.ModelForm):
     class Meta:
@@ -175,29 +181,48 @@ class SupplierForm(forms.ModelForm):
         self.fields['cost_center'].help_text = "Originating Cost/Funds Centre"
         self.fields['source'].help_text = "Unique reference number from IFMIS"
 
+
 class DebitAccountForm(forms.ModelForm):
     class Meta:
         model = DebitAccount
         fields = ['account_number', 'account_name', 'description', 'is_active']
         widgets = {
-            'account_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 13006161244'}),
+            'account_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 0013006161228'}),
             'account_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., (ORT) MG Other Recurrent Expenditure A/C'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
+        help_texts = {
+            'account_number': 'First 9 digits will be used as Party ID for OBDX filename'
+        }
+
 
 class EFTBatchForm(forms.ModelForm):
+    """Batch creation form with OBDX file type selection"""
+    
     class Meta:
         model = EFTBatch
-        fields = ['batch_name', 'file_reference']
+        fields = ['batch_name', 'file_reference', 'file_type']
         widgets = {
-            'batch_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Jan 2024 Suppliers'}),
-            'file_reference': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., WTC01-31.01.2023'}),
+            'batch_name': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'e.g., Salary_Payments (max 50 chars)'
+            }),
+            'file_reference': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'e.g., WTC01-31.01.2023'
+            }),
+            'file_type': forms.Select(attrs={'class': 'form-control'}),
         }
+        help_texts = {
+            'batch_name': 'Custom part of OBDX filename (e.g., "Salary_Payments" becomes OBDXSF_001300616_10.04.2026Salary_Payments.txt)',
+            'file_type': 'Select the type of payment file for proper OBDX naming',
+            'file_reference': 'RBM File Reference format: RunID-DD.MM.YYYY'
+        }
+
 
 class EFTTransactionForm(forms.ModelForm):
     """RBM-Compliant Transaction Form - All fields are MANUAL entry except auto-filled zone"""
     
-    # Override field labels for clarity
     reference_number = forms.CharField(
         label="Invoice Number / Payee Reference",
         max_length=16,
@@ -294,23 +319,21 @@ class EFTTransactionForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Filter active records
         self.fields['supplier'].queryset = Supplier.objects.filter(is_active=True)
         self.fields['scheme'].queryset = Scheme.objects.filter(is_active=True)
         self.fields['debit_account'].queryset = DebitAccount.objects.filter(is_active=True)
         
-        # Mark required fields
         required_fields = ['debit_account', 'supplier', 'scheme', 'amount', 
                           'reference_number', 'source_reference', 'narration']
         for field in required_fields:
             self.fields[field].required = True
         
-        # Help text for RBM compliance
         self.fields['amount'].help_text = "Enter the exact amount from the invoice (required)"
         self.fields['reference_number'].help_text = "⚠️ MANUAL ENTRY: Enter the actual invoice number from the vendor"
         self.fields['source_reference'].help_text = "⚠️ MANUAL ENTRY: Enter the IFMIS reference number"
         self.fields['narration'].help_text = "Clear description of the payment purpose"
         self.fields['cost_center'].help_text = "Auto-filled from scheme - you can override if different from default"
+
 
 class BatchApprovalForm(forms.Form):
     remarks = forms.CharField(
@@ -318,6 +341,7 @@ class BatchApprovalForm(forms.Form):
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         label='Approval Remarks (Optional)'
     )
+
 
 class BatchRejectionForm(forms.Form):
     rejection_reason = forms.CharField(

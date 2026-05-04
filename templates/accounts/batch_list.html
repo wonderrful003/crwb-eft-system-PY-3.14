@@ -54,6 +54,12 @@
     </a>
 </li>
 <li>
+    <a href="{% url 'batch_list' %}?status=EXPORTED">
+        <i class="fas fa-file-export"></i>
+        <span>Exported Batches</span>
+    </a>
+</li>
+<li>
     <a href="{% url 'batch_list' %}?status=REJECTED">
         <i class="fas fa-times-circle"></i>
         <span>Rejected Batches</span>
@@ -94,6 +100,23 @@
 .modal.show .modal-dialog { transform: none; }
 .sidebar-divider { height: 1px; background: var(--gray-200); margin: 1rem 0; }
 .sidebar-header  { padding: 0.5rem 1rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--gray-500); letter-spacing: 0.5px; }
+
+/* Download links */
+.download-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.8rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+.download-txt { background: #0d6efd; color: white; }
+.download-txt:hover { background: #0b5ed7; color: white; }
+.download-csv { background: #198754; color: white; }
+.download-csv:hover { background: #157347; color: white; }
 </style>
 {% endblock %}
 
@@ -106,37 +129,36 @@
             <li class="nav-item">
                 <a class="nav-link {% if not status_filter %}active{% endif %}" href="{% url 'batch_list' %}">
                     <i class="fas fa-list"></i> All
-                    {% if not status_filter and batches %}<span class="badge bg-primary ms-1">{{ batches.count }}</span>{% endif %}
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if status_filter == 'DRAFT' %}active{% endif %}" href="?status=DRAFT">
                     <i class="fas fa-edit"></i> Draft
-                    {% if status_filter == 'DRAFT' and batches %}<span class="badge bg-warning text-dark ms-1">{{ batches.count }}</span>{% endif %}
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if status_filter == 'PENDING_FM' %}active{% endif %}" href="?status=PENDING_FM">
                     <i class="fas fa-user-tie"></i> With FM
-                    {% if status_filter == 'PENDING_FM' and batches %}<span class="badge bg-warning text-dark ms-1">{{ batches.count }}</span>{% endif %}
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if status_filter == 'PENDING_DIRECTOR' %}active{% endif %}" href="?status=PENDING_DIRECTOR">
                     <i class="fas fa-crown"></i> With Director
-                    {% if status_filter == 'PENDING_DIRECTOR' and batches %}<span class="badge bg-info ms-1">{{ batches.count }}</span>{% endif %}
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if status_filter == 'APPROVED' %}active{% endif %}" href="?status=APPROVED">
                     <i class="fas fa-check-circle"></i> Approved
-                    {% if status_filter == 'APPROVED' and batches %}<span class="badge bg-success ms-1">{{ batches.count }}</span>{% endif %}
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if status_filter == 'EXPORTED' %}active{% endif %}" href="?status=EXPORTED">
+                    <i class="fas fa-file-export"></i> Exported
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {% if status_filter == 'REJECTED' %}active{% endif %}" href="?status=REJECTED">
                     <i class="fas fa-times-circle"></i> Rejected
-                    {% if status_filter == 'REJECTED' and batches %}<span class="badge bg-danger ms-1">{{ batches.count }}</span>{% endif %}
                 </a>
             </li>
         </ul>
@@ -222,23 +244,19 @@
                                     <i class="fas fa-trash"></i>
                                 </button>
                                 {% elif batch.status == 'APPROVED' or batch.status == 'EXPORTED' %}
-                                <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">
-                                        <i class="fas fa-download"></i>
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        <li>
-                                            <a class="dropdown-item" href="{% url 'export_batch' batch.id 'txt' %}">
-                                                <i class="fas fa-file-alt text-primary"></i> Download TXT
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="{% url 'export_batch' batch.id 'csv' %}">
-                                                <i class="fas fa-file-csv text-success"></i> Download CSV
-                                            </a>
-                                        </li>
-                                    </ul>
-                                </div>
+                                {# DIRECT DOWNLOAD LINKS - NOT DROPDOWN #}
+                                <a href="{% url 'export_batch' batch.id 'txt' %}" 
+                                   class="btn btn-sm btn-primary" 
+                                   style="margin-left: 5px;"
+                                   target="_blank">
+                                    <i class="fas fa-download"></i> TXT
+                                </a>
+                                <a href="{% url 'export_batch' batch.id 'csv' %}" 
+                                   class="btn btn-sm btn-success" 
+                                   style="margin-left: 5px;"
+                                   target="_blank">
+                                    <i class="fas fa-file-csv"></i> CSV
+                                </a>
                                 {% endif %}
                             </div>
                         </td>
@@ -247,6 +265,36 @@
                 </tbody>
             </table>
         </div>
+        
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div class="d-flex justify-content-center mt-3">
+            <nav>
+                <ul class="pagination">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+        
         {% else %}
         <div class="text-center py-5">
             <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
@@ -329,6 +377,13 @@ $(document).ready(function() {
     }
     document.getElementById('confirmDelete').addEventListener('click', function() {
         document.getElementById('deleteForm').submit();
+    });
+    
+    // Ensure download links work properly
+    $('a[href*="export_batch"]').on('click', function(e) {
+        // Let the browser handle the download naturally
+        console.log('Downloading: ' + $(this).attr('href'));
+        return true;
     });
 });
 </script>
