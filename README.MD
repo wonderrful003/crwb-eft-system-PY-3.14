@@ -772,7 +772,6 @@ python manage.py loaddata backup/reference_data.json
 ```bash
 python manage.py flush --noinput && python manage.py loaddata backup/reference_data.json
 ```
-
 ---
 
 **Developed for**: Central Region Water Board, Malawi  
