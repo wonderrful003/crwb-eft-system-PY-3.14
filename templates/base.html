@@ -915,11 +915,11 @@
             
           <a class="navbar-brand" href="{% url 'dashboard' %}">
     <img src="https://crwb.mw/media/img/logo.png" alt="CRWB Logo">
-  	  <div class="brand-text">
+        <div class="brand-text">
         <span class="brand-name">CRWB EFT System</span>
         <span class="brand-subtitle">Central Region Water Board</span>
-  	  </div>
-		</a>
+        </div>
+        </a>
             
             <div class="navbar-controls">
                 {% if user.is_authenticated %}
@@ -967,195 +967,73 @@
         <div class="sidebar">
             <ul class="sidebar-menu">
                 {% block sidebar_menu %}
-                {# Default sidebar based on current URL path #}
-                
-                {# Check if we're in System Admin section #}
-                {% if 'system-admin' in request.path %}
-                    <!-- System Admin Section -->
-                    <li>
-                        <a href="{% url 'admin_dashboard' %}" 
-                           class="{% if 'system-admin/dashboard' in request.path %}active{% endif %}">
-                            <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
-                        </a>
-                    </li>
-                    
-                    <li class="sidebar-divider"></li>
-                    <li class="sidebar-header">Master Data</li>
-                    
-                    <li>
-                        <a href="{% url 'user_list' %}" 
-                           class="{% if 'users' in request.path %}active{% endif %}">
-                            <i class="fas fa-users"></i> <span>Users</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'bank_list' %}" 
-                           class="{% if 'banks' in request.path %}active{% endif %}">
-                            <i class="fas fa-university"></i> <span>Banks</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'zone_list' %}" 
-                           class="{% if 'zones' in request.path %}active{% endif %}">
-                            <i class="fas fa-map-marked-alt"></i> <span>Zones</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'scheme_list' %}" 
-                           class="{% if 'schemes' in request.path %}active{% endif %}">
-                            <i class="fas fa-project-diagram"></i> <span>Schemes</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'supplier_list' %}" 
-                           class="{% if 'suppliers' in request.path %}active{% endif %}">
-                            <i class="fas fa-truck"></i> <span>Suppliers</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'debit_account_list' %}" 
-                           class="{% if 'debit-accounts' in request.path %}active{% endif %}">
-                            <i class="fas fa-credit-card"></i> <span>Debit Accounts</span>
-                        </a>
-                    </li>
-                    
-                    <li class="sidebar-divider"></li>
-                    <li class="sidebar-header">System</li>
-                    
-                    <li>
-                        <a href="/admin/" target="_blank">
-                            <i class="fas fa-cog"></i> <span>Django Admin</span>
-                        </a>
-                    </li>
-                
-                {# Check if we're in Accounts section #}
-                {% elif 'accounts' in request.path %}
-                    <!-- Accounts Personnel Section -->
-                    <li>
-                        <a href="{% url 'accounts_dashboard' %}" 
-                           class="{% if 'accounts/dashboard' in request.path %}active{% endif %}">
-                            <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'create_batch' %}"
-                           class="{% if 'create' in request.path %}active{% endif %}">
-                            <i class="fas fa-plus-circle"></i> <span>Create Batch</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'batch_list' %}" 
-                           class="{% if 'accounts/batches' in request.path and 'create' not in request.path and 'edit' not in request.path and 'view' not in request.path %}active{% endif %}">
-                            <i class="fas fa-list"></i> <span>All Batches</span>
-                        </a>
-                    </li>
-                    
-                    <li class="sidebar-divider"></li>
-                    <li class="sidebar-header">Filter by Status</li>
-                    
-                    <li>
-                        <a href="{% url 'batch_list' %}?status=DRAFT">
-                            <i class="fas fa-edit"></i> <span>Draft Batches</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'batch_list' %}?status=PENDING">
-                            <i class="fas fa-clock"></i> <span>Pending Approval</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'batch_list' %}?status=APPROVED">
-                            <i class="fas fa-check-circle"></i> <span>Approved Batches</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'batch_list' %}?status=REJECTED">
-                            <i class="fas fa-times-circle"></i> <span>Rejected Batches</span>
-                        </a>
-                    </li>
-                
-                {# Check if we're in Authorizer section #}
-                {% elif 'authorizer' in request.path %}
-                    <!-- Authorizer Section -->
-                    <li>
-                        <a href="{% url 'authorizer_dashboard' %}" 
-                           class="{% if 'authorizer/dashboard' in request.path %}active{% endif %}">
-                            <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'authorizer_batch_list' %}" 
-                           class="{% if 'authorizer/batches' in request.path and 'review' not in request.path %}active{% endif %}">
-                            <i class="fas fa-clipboard-check"></i> <span>Pending Batches</span>
-                        </a>
-                    </li>
-                    
-                    <li class="sidebar-divider"></li>
-                    <li class="sidebar-header">Review Status</li>
-                    
-                    <li>
-                        <a href="{% url 'authorizer_batch_list' %}?status=PENDING">
-                            <i class="fas fa-clock"></i> <span>Awaiting Review</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'authorizer_batch_list' %}?status=APPROVED">
-                            <i class="fas fa-check-circle"></i> <span>Approved</span>
-                        </a>
-                    </li>
-                    
-                    <li>
-                        <a href="{% url 'authorizer_batch_list' %}?status=REJECTED">
-                            <i class="fas fa-times-circle"></i> <span>Rejected</span>
-                        </a>
-                    </li>
-                
-                {# Default - Show role switcher #}
-                {% else %}
-                    <li>
-                        <a href="{% url 'dashboard' %}" 
-                           class="{% if request.path == '/dashboard/' %}active{% endif %}">
-                            <i class="fas fa-home"></i> <span>Main Dashboard</span>
-                        </a>
-                    </li>
-                    
-                    {% if user.is_superuser or user.is_staff %}
-                    <li>
-                        <a href="{% url 'admin_dashboard' %}">
-                            <i class="fas fa-tachometer-alt"></i> <span>System Admin</span>
-                        </a>
-                    </li>
-                    {% endif %}
-                    
-                    {% if user.groups.all.0 and 'Accounts' in user.groups.all.0.name or user.is_superuser %}
-                    <li>
-                        <a href="{% url 'accounts_dashboard' %}">
-                            <i class="fas fa-chart-line"></i> <span>Accounts</span>
-                        </a>
-                    </li>
-                    {% endif %}
-                    
-                    {% if user.groups.all.0 and 'Authorizer' in user.groups.all.0.name or user.is_superuser %}
-                    <li>
-                        <a href="{% url 'authorizer_dashboard' %}">
-                            <i class="fas fa-check-circle"></i> <span>Authorizer</span>
-                        </a>
-                    </li>
-                    {% endif %}
-                {% endif %}
-                {% endblock %}
+
+{% if 'system-admin' in request.path %}
+    <li><a href="{% url 'admin_dashboard' %}" class="{% if 'dashboard' in request.path %}active{% endif %}"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+    <li class="sidebar-divider"></li>
+    <li class="sidebar-header">Master Data</li>
+    <li><a href="{% url 'user_list' %}" class="{% if 'users' in request.path %}active{% endif %}"><i class="fas fa-users"></i><span>Users</span></a></li>
+    <li><a href="{% url 'bank_list' %}" class="{% if 'banks' in request.path %}active{% endif %}"><i class="fas fa-university"></i><span>Banks</span></a></li>
+    <li><a href="{% url 'zone_list' %}" class="{% if 'zones' in request.path %}active{% endif %}"><i class="fas fa-map-marked-alt"></i><span>Zones</span></a></li>
+    <li><a href="{% url 'scheme_list' %}" class="{% if 'schemes' in request.path %}active{% endif %}"><i class="fas fa-project-diagram"></i><span>Schemes</span></a></li>
+    <li><a href="{% url 'supplier_list' %}" class="{% if 'suppliers' in request.path %}active{% endif %}"><i class="fas fa-truck"></i><span>Suppliers</span></a></li>
+    <li><a href="{% url 'debit_account_list' %}" class="{% if 'debit-accounts' in request.path %}active{% endif %}"><i class="fas fa-credit-card"></i><span>Debit Accounts</span></a></li>
+    <li class="sidebar-divider"></li>
+    <li><a href="/admin/" target="_blank"><i class="fas fa-cog"></i><span>Django Admin</span></a></li>
+
+{% elif 'finance-manager' in request.path %}
+    <li><a href="{% url 'fm_dashboard' %}" class="{% if request.resolver_match.url_name == 'fm_dashboard' %}active{% endif %}"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+    <li><a href="{% url 'fm_batch_list' %}" class="{% if request.resolver_match.url_name == 'fm_batch_list' %}active{% endif %}"><i class="fas fa-list"></i><span>All Batches</span></a></li>
+    <li class="sidebar-divider"></li>
+    <li class="sidebar-header">Filter by Status</li>
+    <li><a href="{% url 'fm_batch_list' %}?status=PENDING_FM"><i class="fas fa-clock"></i><span>Awaiting Review</span></a></li>
+    <li><a href="{% url 'fm_batch_list' %}?status=PENDING_DIRECTOR"><i class="fas fa-paper-plane"></i><span>Forwarded to Director</span></a></li>
+    <li><a href="{% url 'fm_batch_list' %}?status=APPROVED"><i class="fas fa-check-circle"></i><span>Approved</span></a></li>
+    <li><a href="{% url 'fm_batch_list' %}?status=REJECTED"><i class="fas fa-times-circle"></i><span>Rejected</span></a></li>
+
+{% elif 'director' in request.path %}
+    <li><a href="{% url 'director_dashboard' %}" class="{% if request.resolver_match.url_name == 'director_dashboard' %}active{% endif %}"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+    <li><a href="{% url 'director_batch_list' %}" class="{% if request.resolver_match.url_name == 'director_batch_list' %}active{% endif %}"><i class="fas fa-list"></i><span>All Batches</span></a></li>
+    <li class="sidebar-divider"></li>
+    <li class="sidebar-header">Filter by Status</li>
+    <li><a href="{% url 'director_batch_list' %}?status=PENDING_DIRECTOR"><i class="fas fa-crown"></i><span>Awaiting Approval</span></a></li>
+    <li><a href="{% url 'director_batch_list' %}?status=APPROVED"><i class="fas fa-check-circle"></i><span>Approved</span></a></li>
+    <li><a href="{% url 'director_batch_list' %}?status=EXPORTED"><i class="fas fa-file-export"></i><span>Exported</span></a></li>
+    <li><a href="{% url 'director_batch_list' %}?status=REJECTED"><i class="fas fa-times-circle"></i><span>Rejected</span></a></li>
+
+{% elif 'accounts' in request.path %}
+    <li><a href="{% url 'accounts_dashboard' %}" class="{% if request.resolver_match.url_name == 'accounts_dashboard' %}active{% endif %}"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+    <li><a href="{% url 'create_batch' %}" class="{% if request.resolver_match.url_name == 'create_batch' %}active{% endif %}"><i class="fas fa-plus-circle"></i><span>Create Batch</span></a></li>
+    <li><a href="{% url 'batch_list' %}" class="{% if request.resolver_match.url_name == 'batch_list' %}active{% endif %}"><i class="fas fa-list"></i><span>My Batches</span></a></li>
+    <li class="sidebar-divider"></li>
+    <li class="sidebar-header">Filter by Status</li>
+    <li><a href="{% url 'batch_list' %}?status=DRAFT"><i class="fas fa-edit"></i><span>Draft</span></a></li>
+    <li><a href="{% url 'batch_list' %}?status=PENDING_FM"><i class="fas fa-user-tie"></i><span>With Finance Manager</span></a></li>
+    <li><a href="{% url 'batch_list' %}?status=PENDING_DIRECTOR"><i class="fas fa-crown"></i><span>With Director</span></a></li>
+    <li><a href="{% url 'batch_list' %}?status=APPROVED"><i class="fas fa-check-circle"></i><span>Approved</span></a></li>
+    <li><a href="{% url 'batch_list' %}?status=REJECTED"><i class="fas fa-times-circle"></i><span>Rejected</span></a></li>
+
+{% elif 'authorizer' in request.path %}
+    <li><a href="{% url 'authorizer_dashboard' %}"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+    <li><a href="{% url 'authorizer_batch_list' %}"><i class="fas fa-clipboard-check"></i><span>Pending Batches</span></a></li>
+
+{% else %}
+    {# Shared batch view or other — show role-appropriate nav based on user group #}
+    {% if user.is_superuser or user.groups.all.0.name == 'System Admin' %}
+        <li><a href="{% url 'admin_dashboard' %}"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+    {% elif user.groups.all.0.name == 'Director of Finance' %}
+        <li><a href="{% url 'director_dashboard' %}"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+        <li><a href="{% url 'director_batch_list' %}"><i class="fas fa-list"></i><span>All Batches</span></a></li>
+    {% elif user.groups.all.0.name == 'Finance Manager' %}
+        <li><a href="{% url 'fm_dashboard' %}"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+        <li><a href="{% url 'fm_batch_list' %}"><i class="fas fa-list"></i><span>All Batches</span></a></li>
+    {% elif user.groups.all.0.name == 'Accounts Personnel' %}
+        <li><a href="{% url 'accounts_dashboard' %}"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+        <li><a href="{% url 'batch_list' %}"><i class="fas fa-list"></i><span>My Batches</span></a></li>
+    {% endif %}
+{% endif %}
+
+{% endblock %}
             </ul>
         </div>
         {% endif %}

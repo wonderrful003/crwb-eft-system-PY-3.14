@@ -89,7 +89,6 @@ urlpatterns = [
     path('accounts/batches/', views.batch_list, name='batch_list'),
     path('accounts/batches/create/', views.create_batch, name='create_batch'),
     path('accounts/batches/<int:batch_id>/edit/', views.edit_batch, name='edit_batch'),
-    path('accounts/batches/<int:batch_id>/view/', views.view_batch, name='view_batch'),
     path('accounts/batches/<int:batch_id>/submit/', views.submit_for_approval, name='submit_batch'),
     path('accounts/batches/<int:batch_id>/delete/', views.delete_batch, name='delete_batch'),
     path('accounts/batches/<int:batch_id>/transaction/add/', views.add_transaction, name='add_transaction'),
@@ -100,8 +99,12 @@ urlpatterns = [
     path('accounts/batches/export-selected/', views.batch_export_selected, name='batch_export_selected'),
     path('accounts/batches/bulk-delete/', views.batch_bulk_delete, name='batch_bulk_delete'),
 
-    # EFT File Preview (read-only — for FM, Director, Accounts)
+    # ========== SHARED URLs (accessible by ALL roles) ==========
+    # These use the role-aware view_batch and preview_eft_file
+    path('batches/<int:batch_id>/view/', views.view_batch, name='view_batch'),
     path('batches/<int:batch_id>/preview/', views.preview_eft_file, name='preview_eft_file'),
+    path('batches/<int:batch_id>/export/<str:format>/', views.export_batch, name='export_batch_shared'),
+    path('batches/<int:batch_id>/export/', views.export_batch, {'format': 'txt'}, name='export_batch'),
 
     # Finance Manager
     path('finance-manager/dashboard/', views.fm_dashboard, name='fm_dashboard'),
@@ -117,7 +120,7 @@ urlpatterns = [
     path('director/batches/<int:batch_id>/approve/', views.director_approve_batch, name='director_approve_batch'),
     path('director/batches/<int:batch_id>/reject/', views.director_reject_batch, name='director_reject_batch'),
 
-    # Legacy Authorizer
+    # Legacy Authorizer (redirects to appropriate role)
     path('authorizer/dashboard/', views.authorizer_dashboard, name='authorizer_dashboard'),
     path('authorizer/batches/', views.authorizer_batch_list, name='authorizer_batch_list'),
     path('authorizer/batches/<int:batch_id>/review/', views.review_batch, name='review_batch'),
