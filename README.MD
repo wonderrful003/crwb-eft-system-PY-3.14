@@ -1,4 +1,6 @@
+Here is your updated Markdown with the correct RBM OBDX Payment File fields documented:
 
+---
 
 # 🏦 CRWB EFT Payment Processing System
 
@@ -27,7 +29,7 @@
 
 ## 📖 Overview
 
-The CRWB EFT System is a web-based payment processing application designed specifically for Central Region Water Board, Malawi. It facilitates electronic funds transfer operations while ensuring full compliance with Reserve Bank of Malawi (RBM) specifications.
+The CRWB EFT System is a web-based payment processing application designed specifically for Central Region Water Board, Malawi. It facilitates electronic funds transfer operations while ensuring full compliance with Reserve Bank of Malawi (RBM) OBDX Payment File specifications.
 
 ---
 
@@ -53,10 +55,11 @@ The CRWB EFT System is a web-based payment processing application designed speci
 - Complete audit trail
 
 ### 📊 RBM Compliance
-- Automatic RBM file format generation
-- Validation of all required fields
+- Automatic RBM OBDX Payment File format generation
+- Validation of all 17 required body fields
 - Text file export in RBM-compatible format
 - Real-time compliance checking
+- OBDXPMN naming convention: `OBDXPMN_PARTYID_28JUN2025XXXXXXXXXXX.txt`
 
 ---
 
@@ -533,7 +536,7 @@ crwb-eft-system/
 │   ├── urls.py                # URL routing
 │   ├── forms.py               # Django forms
 │   ├── admin.py               # Django admin interface
-│   ├── eft_generator.py       # RBM file generator
+│   ├── eft_generator.py       # RBM OBDX Payment File generator
 │   └── apps.py                # App configuration
 ├── eft_system/                # Django project
 │   ├── settings.py            # Project settings
@@ -555,28 +558,69 @@ crwb-eft-system/
 
 ## 🏦 RBM Compliance
 
-### Transaction Format
-The system generates RBM-compliant EFT files with exact format:
+### File Naming Convention (OBDX Payment File)
 
 ```
-1;[Sequence];MWK;[Account];[Name];[Amount];[Details1];[Details2];;;;;[BIC];[CreditAcc];;;;[Ref];[Desc]
+Format: OBDXPMN_PARTYID_28JUN2025XXXXXXXXXXX.txt
+
+Example: OBDXPMN_001300616_28JUN2025BATCH001.txt
 ```
 
-### Required Fields
-1. **Record Type** (1=Detail)
-2. **Sequence Number** (4 digits, zero-padded)
-3. **Currency** (MWK)
-4. **Debit Account Number** (20 characters)
-5. **Debit Account Name** (55 characters)
-6. **Payment Amount** (2 decimal places)
-7. **Payee Details 1** (55 characters)
-8. **Payee Details 2** (7 characters, vendor code)
-9-12. **Payment Details 3-6** (Optional)
-13. **Beneficiary Bank BIC** (8 or 11 characters)
-14. **Credit Account Number** (20 characters)
-15-17. **Mandate Details** (Optional)
-18. **Originator's Reference** (18 characters, IFMIS reference)
-19. **Transaction Description** (200 characters)
+- **OBDXPMN**: Payment file identifier (domestic payments to suppliers)
+- **PARTY ID**: First 9 digits of CRWB's debit account number (e.g., 001300616)
+- **DATE**: Format `DDMMMYYYY` (e.g., 28JUN2025)
+- **Unique ID**: Batch reference or unique identifier (max 50 characters total)
+
+### Header Record (5 fields) - Semicolon Delimited
+
+| Field | Description | Format | Example |
+|-------|-------------|--------|---------|
+| 0 | Header Line Identifier | Fixed "0" | `0` |
+| 1 | File Reference | Max 16 chars | `REF2025123001` |
+| 2 | Currency Code | 3 chars | `MWK` |
+| 3 | File Total | 2 decimal places | `1000000.00` |
+| 4 | Total Count | Zero-padded to 4 digits | `0042` |
+
+### Body Record (17 fields) - Semicolon Delimited
+
+| Field | Description | Max Length | Required | Example |
+|-------|-------------|------------|----------|---------|
+| 0 | Line Items Identifier | Fixed "1" | Yes | `1` |
+| 1 | Transaction Serial | 4 digits (zero-padded) | Yes | `0001` |
+| 2 | Currency Code | 3 chars | Yes | `MWK` |
+| 3 | Debit Account Number | 20 chars | Yes | `0013006161228` |
+| 4 | Debit Account Name | 55 chars | Yes | `CRWB LTD` |
+| 5 | Payment Amount | 2 decimals | Yes | `5000.25` |
+| 6 | Payee Details | 55 chars | Yes | `Bella Enterprise Pvt Ltd` |
+| 7 | Vendor Code | 7 chars | Yes | `57819` |
+| 8 | Employee Number | 6 chars | No | `` |
+| 9 | National ID | 8 chars | No | `` |
+| 10 | Invoice Number | 16 chars | Yes | `INV-2025-001` |
+| 11 | Payee BIC | 11 chars | Yes | `NBMAMWMW` |
+| 12 | Credit Account Number | 20 chars | Yes | `1234567890` |
+| 13 | Cost Center | 50 chars | Yes | `03000101` |
+| 14 | DATE | EMPTY (produces ;;) | No | `` |
+| 15 | Source Reference | 18 chars | Yes | `IFMIS-REF-001` |
+| 16 | Description | 200 chars | Yes | `Payment for water treatment chemicals` |
+
+### Sample Output File
+
+```
+0;REF2025123001;MWK;10000.50;0002
+1;0001;MWK;0013006161228;CRWB LTD;5000.25;Bella Enterprise Pvt Ltd;57819;;;INV-2025-001;NBMAMWMW;1234567890;03000101;;IFMIS-REF-001;Payment for water treatment chemicals
+1;0002;MWK;0013006161228;CRWB LTD;5000.25;Anderson Trading;0003;;;INV-2025-002;SBICMWMX;9876543210;03000101;;IFMIS-REF-002;Payment for office supplies
+```
+
+### Field Validation Rules
+
+1. **Record Type** must be `0` for header, `1` for body
+2. **Sequence Numbers** must be zero-padded to 4 digits (0001, 0002, etc.)
+3. **Currency** must be consistent across all transactions in a batch
+4. **Payment Amount** must have exactly 2 decimal places
+5. **Payee BIC** must be valid SWIFT code (8 or 11 characters)
+6. **Total Count** in header must match number of body records
+7. **File Total** in header must match sum of all Payment Amounts
+8. **DATE field (Field 14)** must be EMPTY (produces `;;` in output)
 
 ---
 
@@ -692,7 +736,7 @@ This software is proprietary and developed exclusively for Central Region Water 
   - Two-stage approval workflow (Finance Manager + Director)
   - User delete confirmation page
   - Enhanced audit logging
-  - RBM compliance improvements
+  - RBM OBDX Payment File compliance
   - Reference data in backup folder
 - **Last Updated**: March 2026
 
@@ -733,4 +777,5 @@ python manage.py flush --noinput && python manage.py loaddata backup/reference_d
 
 **Developed for**: Central Region Water Board, Malawi  
 **Purpose**: Electronic Funds Transfer Processing System  
+**File Format**: RBM OBDX Payment File (OBDXPMN)  
 **Compliance**: Reserve Bank of Malawi (RBM) Standards
